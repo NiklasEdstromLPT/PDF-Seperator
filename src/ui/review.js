@@ -1,0 +1,77 @@
+import { $ } from "./dom.js";
+import { sanitize } from "../pipeline/filename.js";
+
+// Render the review grid for the current state.bundles list.
+// onChange is called when the user edits a name or toggles skip — useful for any future side effects.
+export function renderReview(state, onChange = () => {}) {
+  const grid = $("grid");
+  grid.innerHTML = "";
+
+  const totalPages = state.bundles.reduce((s, b) => s + b.pages.length, 0);
+  $("review-meta").textContent =
+    `${state.bundles.length} bundles · ${totalPages} pages total · click any name to edit`;
+
+  for (const b of state.bundles) {
+    grid.appendChild(buildCard(b, state.prefix, onChange));
+  }
+}
+
+function buildCard(bundle, prefix, onChange) {
+  const card = el("div", "card" + (bundle.skipped ? " skipped" : ""));
+
+  const badges = el("div", "badges");
+  const idx = el("span", "badge idx", "#" + String(bundle.index + 1).padStart(2, "0"));
+  const pg = el("span", "badge", `${bundle.pages.length} pg`);
+  badges.append(idx, pg);
+  card.appendChild(badges);
+
+  const img = document.createElement("img");
+  img.className = "thumb";
+  img.alt = `Front page of bundle ${bundle.index + 1}`;
+  img.src = bundle.thumbnail;
+  card.appendChild(img);
+
+  const fn = el("div", "filename");
+  const lockL = el("span", "lock", prefix);
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = sanitize(bundle.address);
+  input.placeholder = "name";
+  input.spellcheck = false;
+  input.addEventListener("input", () => {
+    bundle.address = input.value;
+    onChange(bundle);
+  });
+  const lockR = el("span", "lock right", ".pdf");
+  fn.append(lockL, input, lockR);
+  card.appendChild(fn);
+
+  const status = el("div", "status");
+  const pill = el(
+    "span",
+    "pill" + (bundle.addressDetected ? "" : " warn"),
+    bundle.addressDetected ? "address detected" : "address not auto-detected"
+  );
+  status.appendChild(pill);
+
+  const skipBtn = document.createElement("button");
+  skipBtn.className = "subtle";
+  skipBtn.textContent = bundle.skipped ? "Restore" : "Skip";
+  skipBtn.addEventListener("click", () => {
+    bundle.skipped = !bundle.skipped;
+    card.classList.toggle("skipped", bundle.skipped);
+    skipBtn.textContent = bundle.skipped ? "Restore" : "Skip";
+    onChange(bundle);
+  });
+  status.appendChild(skipBtn);
+  card.appendChild(status);
+
+  return card;
+}
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}

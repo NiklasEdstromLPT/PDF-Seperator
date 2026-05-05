@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.vite/
+*.log
+
+# Python (test fixture generator)
+__pycache__/
+*.pyc
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Local env / secrets — paranoid catch-all even though the app has no backend
+.env
+.env.*

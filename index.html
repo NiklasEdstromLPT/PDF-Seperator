@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dezzy Check Splitter</title>
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body>
+
+<header class="app">
+  <h1>Dezzy Check Splitter</h1>
+  <span class="sub">internal &middot; client-side only</span>
+</header>
+
+<main>
+
+  <section id="screen-upload" class="screen active">
+    <div id="drop" class="drop" tabindex="0" role="button" aria-label="Upload a PDF">
+      <h2>Drop a batched PDF here</h2>
+      <p>or <span class="browse">browse for a file</span></p>
+      <input type="file" id="file-input" accept="application/pdf" hidden />
+    </div>
+
+    <div class="settings">
+      <div>
+        <label for="prefix">Filename prefix</label>
+        <input type="text" id="prefix" value="LPTR-" />
+        <div class="help">Prepended to every output file.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-progress" class="screen">
+    <div class="progress-wrap">
+      <h2 id="progress-title">Processing</h2>
+      <div id="progress-detail" class="progress-detail">&nbsp;</div>
+      <div class="stages" id="stages">
+        <div class="stage" data-stage="read"><span class="dot"></span><span>Reading PDF</span></div>
+        <div class="stage" data-stage="detect"><span class="dot"></span><span>Detecting red separator pages</span></div>
+        <div class="stage" data-stage="split"><span class="dot"></span><span>Splitting into bundles</span></div>
+        <div class="stage" data-stage="ocr"><span class="dot"></span><span>Reading addresses</span></div>
+      </div>
+      <div class="bar"><div id="bar-fill"></div></div>
+    </div>
+  </section>
+
+  <section id="screen-review" class="screen">
+    <div class="review-header">
+      <div>
+        <h2>Review &amp; download</h2>
+        <div class="meta" id="review-meta"></div>
+      </div>
+      <div class="review-actions">
+        <button id="btn-restart" class="subtle">Start Over</button>
+        <button id="btn-download" class="primary">Download All as ZIP</button>
+      </div>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
