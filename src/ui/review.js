@@ -24,9 +24,22 @@ export function renderReview(state, onChange = () => {}) {
   let cardPairs = [];
 
   const reorder = () => {
-    [...cardPairs]
-      .sort((a, b) => byReviewPriority(a.bundle, b.bundle))
-      .forEach(({ card }) => grid.appendChild(card));
+    const sorted = [...cardPairs].sort((a, b) => byReviewPriority(a.bundle, b.bundle));
+
+    // Short-circuit when DOM order already matches the desired order. Calling
+    // appendChild on an already-attached node detaches and re-inserts it,
+    // which kills focus on any input the user is currently typing into. We
+    // only want to actually move nodes when something has truly changed.
+    const children = grid.children;
+    let inSync = children.length === sorted.length;
+    if (inSync) {
+      for (let i = 0; i < sorted.length; i++) {
+        if (children[i] !== sorted[i].card) { inSync = false; break; }
+      }
+    }
+    if (inSync) return;
+
+    for (const { card } of sorted) grid.appendChild(card);
   };
 
   const updateCounter = () => updateNeedsCount(state.bundles);
