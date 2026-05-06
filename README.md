@@ -31,6 +31,9 @@ dezzy-check-splitter/
 ├── index.html              entry shell
 ├── package.json
 ├── vite.config.js
+├── .github/
+│   └── workflows/
+│       └── deploy.yml      build + publish to GitHub Pages on push to main
 ├── src/
 │   ├── main.js             entry: wires UI events to the pipeline
 │   ├── state.js            shared in-memory state (no persistence)
@@ -40,18 +43,18 @@ dezzy-check-splitter/
 │   │   ├── redDetect.js    canvas sampling for red separator pages
 │   │   ├── bundles.js      splits the page list on separator runs
 │   │   ├── frontPage.js    thumbnail render, text extract, OCR fallback
-│   │   ├── address.js      US street-address regex
-│   │   ├── filename.js     sanitize + dedupe
+│   │   ├── address.js      three-tier US street-address extraction
+│   │   ├── checkNumber.js  banner regex + position-ranked digit candidates
+│   │   ├── filename.js     sanitize + compose + dedupe
 │   │   └── zip.js          pdf-lib copyPages + JSZip pack + download trigger
 │   └── ui/
 │       ├── dom.js          $/screens/toast/yield helpers
 │       ├── upload.js       drop zone + file picker + settings
 │       ├── progress.js     stage indicator + bar
-│       └── review.js       review grid + cards
-└── tests/
-    ├── generate_sample_pdf.py
-    └── sample.pdf
+│       └── review.js       review grid + cards (sort + reorder)
 ```
+
+`tests/` and `sample_check_generator/` are gitignored (see [.gitignore](.gitignore)) — local-only fixture generators not part of the shipped tool.
 
 The pipeline modules know nothing about the DOM beyond the progress helpers. The UI modules know nothing about PDF.js / pdf-lib / Tesseract. `main.js` is the only place they meet.
 
@@ -68,6 +71,26 @@ Production build (static files, deployable to any directory):
 npm run build    # outputs to dist/
 npm run preview  # serve the built output locally to verify
 ```
+
+## Deploying to GitHub Pages
+
+A workflow at [.github/workflows/deploy.yml](.github/workflows/deploy.yml) builds and publishes the `dist/` folder on every push to `main`.
+
+One-time setup in the GitHub repo:
+
+1. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
+2. Push `main` (or trigger the workflow manually under the Actions tab). The first deploy creates the `github-pages` environment automatically.
+3. The site URL is shown on the Pages settings page once the first deploy completes — typically `https://<owner>.github.io/<repo>/`.
+
+How the build path works: Vite needs to know the URL subpath the site will be served from so absolute asset URLs (PDF.js worker, etc.) resolve correctly. The workflow injects the repo name as the build-time `VITE_BASE` env var; locally the default `./` (relative paths) is used so `npm run dev` and `npm run preview` keep working without configuration.
+
+If you fork or rename the repo, no code changes are needed — `VITE_BASE` adapts to the repo name automatically.
+
+### Things to know before deploying publicly
+
+- **GitHub Pages is public hosting.** Anyone with the URL can use the tool. The HTML/JS source is visible. No customer data leaves the user's browser, but the *tool itself* is exposed. If LPT needs gating, host internally instead.
+- **First OCR run downloads the Tesseract English language model** (~30 MB) from `tessdata.projectnaptha.com` and caches it in IndexedDB. Both behaviors technically violate the spec's "no external calls / no IndexedDB" hard constraints. The cached data is the model itself, not customer data, but it should be reviewed with compliance before pointing real customer scans at the deployed site.
+- **PDFs are processed entirely in the user's browser.** No upload, no server side. That's true on GH Pages and any other static host.
 
 ## Settings
 

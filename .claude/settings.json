@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(python generate_fake_packets.py 8 ./sample_checks --bundle --malformed-pct 15)",
-      "Bash(python generate_fake_packets.py 18 ./sample_checks --bundle --malformed-pct 60)"
+      "Bash(python generate_fake_packets.py 18 ./sample_checks --bundle --malformed-pct 60)",
+      "Bash(rm -rf dist)",
+      "Bash(VITE_BASE=/PDF-Seperator/ npm run build)",
+      "Bash(MSYS_NO_PATHCONV=1 VITE_BASE=/PDF-Seperator/ npm run build)"
     ]
   }
 }
