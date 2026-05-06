@@ -217,6 +217,41 @@ main {
 }
 .review-actions { display: flex; gap: 10px; }
 
+.needs-count {
+  font-family: var(--sans);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--warn);
+  margin: -8px 0 22px;
+  padding: 12px 16px;
+  background: #fdf3e3;
+  border: 1px solid var(--warn);
+  border-left-width: 4px;
+  border-radius: 6px;
+}
+.confirm-btn {
+  margin-left: auto;
+  background: var(--ok);
+  color: #fff;
+  border-color: var(--ok);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 6px 12px;
+}
+.confirm-btn:hover {
+  background: #2f5e3d;
+  border-color: #2f5e3d;
+}
+.confirm-btn.confirmed {
+  background: var(--bg-elev);
+  color: var(--ok);
+  border-color: var(--ok);
+  font-weight: 600;
+}
+.confirm-btn.confirmed:hover {
+  background: var(--accent-soft);
+}
+
 button {
   font: inherit;
   cursor: pointer;

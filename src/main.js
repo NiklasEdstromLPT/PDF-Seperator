@@ -1,7 +1,7 @@
 import { state } from "./state.js";
 import { $, showScreen, toast } from "./ui/dom.js";
 import { initUpload } from "./ui/upload.js";
-import { renderReview } from "./ui/review.js";
+import { renderReview, countNeedsReview } from "./ui/review.js";
 import { runPipeline, PipelineError } from "./pipeline/index.js";
 import { buildZip, suggestZipName, triggerDownload } from "./pipeline/zip.js";
 
@@ -34,6 +34,15 @@ $("btn-download").addEventListener("click", async () => {
   if (live.length === 0) {
     toast("Every bundle is skipped — nothing to download.", "bad");
     return;
+  }
+  const pending = countNeedsReview(live);
+  if (pending > 0) {
+    const ok = confirm(
+      pending === 1
+        ? `1 bundle is still flagged as "needs review". Download anyway?`
+        : `${pending} bundles are still flagged as "needs review". Download anyway?`
+    );
+    if (!ok) return;
   }
   btn.disabled = true;
   const original = btn.textContent;

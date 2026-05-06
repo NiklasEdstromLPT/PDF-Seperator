@@ -10,15 +10,39 @@ export function renderReview(state, onChange = () => {}) {
   $("review-meta").textContent =
     `${state.bundles.length} bundles · ${totalPages} pages total · click any name to edit`;
 
+  const updateCounter = () => updateNeedsCount(state.bundles);
+  const wrappedOnChange = (b) => { onChange(b); updateCounter(); };
+
   for (const b of state.bundles) {
-    grid.appendChild(buildCard(b, state.prefix, onChange));
+    grid.appendChild(buildCard(b, state.prefix, wrappedOnChange));
   }
+  updateCounter();
+}
+
+// Whether a bundle is still flagged for human review.
+// A bundle escapes review when it had an auto-detected address, was manually
+// confirmed via the checkmark, or was skipped (excluded from output).
+export function needsReview(b) {
+  return !b.skipped && !b.addressDetected && !b.reviewConfirmed;
+}
+
+export function countNeedsReview(bundles) {
+  return bundles.filter(needsReview).length;
+}
+
+function updateNeedsCount(bundles) {
+  const el = $("review-needs-count");
+  if (!el) return;
+  const n = countNeedsReview(bundles);
+  el.hidden = n === 0;
+  if (n === 0) return;
+  el.textContent = n === 1 ? "1 Bundle needs review" : `${n} bundles need review`;
 }
 
 function buildCard(bundle, prefix, onChange) {
   const classes = ["card"];
   if (bundle.skipped) classes.push("skipped");
-  if (!bundle.addressDetected && !bundle.skipped) classes.push("needs-review");
+  if (needsReview(bundle)) classes.push("needs-review");
   const card = el("div", classes.join(" "));
 
   const badges = el("div", "badges");
@@ -52,24 +76,59 @@ function buildCard(bundle, prefix, onChange) {
   card.appendChild(fn);
 
   const status = el("div", "status");
-  const pill = el(
-    "span",
-    "pill" + (bundle.addressDetected ? "" : " warn"),
-    bundle.addressDetected ? "address detected" : "needs review — enter address"
-  );
+  const pill = el("span", "pill");
   status.appendChild(pill);
+
+  // Manual-confirm button: only meaningful when the bundle wasn't auto-detected
+  // and isn't skipped. Clicking it flips reviewConfirmed so the card leaves the
+  // needs-review pool (and the top-of-screen counter ticks down).
+  let confirmBtn = null;
+  if (!bundle.addressDetected && !bundle.skipped) {
+    confirmBtn = document.createElement("button");
+    confirmBtn.className = "confirm-btn";
+    confirmBtn.addEventListener("click", () => {
+      bundle.reviewConfirmed = !bundle.reviewConfirmed;
+      applyReviewState();
+      onChange(bundle);
+    });
+    badges.appendChild(confirmBtn);
+  }
 
   const skipBtn = document.createElement("button");
   skipBtn.className = "subtle";
-  skipBtn.textContent = bundle.skipped ? "Restore" : "Skip";
   skipBtn.addEventListener("click", () => {
     bundle.skipped = !bundle.skipped;
-    card.classList.toggle("skipped", bundle.skipped);
-    skipBtn.textContent = bundle.skipped ? "Restore" : "Skip";
+    applyReviewState();
     onChange(bundle);
   });
   status.appendChild(skipBtn);
   card.appendChild(status);
+
+  // Reflects bundle state across pill, confirm button, skip button, and the
+  // card's review/skip CSS classes. Called once at build and again on every
+  // confirm/skip toggle so the same logic owns initial render and updates.
+  function applyReviewState() {
+    card.classList.toggle("skipped", bundle.skipped);
+    card.classList.toggle("needs-review", needsReview(bundle));
+
+    pill.classList.toggle("warn", needsReview(bundle));
+    pill.textContent = bundle.addressDetected
+      ? "address detected"
+      : bundle.reviewConfirmed
+        ? "approved"
+        : "needs review";
+
+    if (confirmBtn) {
+      confirmBtn.textContent = bundle.reviewConfirmed ? "✓ Approved" : "✓ Approve";
+      confirmBtn.title = bundle.reviewConfirmed
+        ? "Click to flag again as needs review"
+        : "Mark this bundle as approved";
+      confirmBtn.classList.toggle("confirmed", !!bundle.reviewConfirmed);
+    }
+
+    skipBtn.textContent = bundle.skipped ? "Restore" : "Skip";
+  }
+  applyReviewState();
 
   return card;
 }
