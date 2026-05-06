@@ -1,6 +1,6 @@
 import { PDFDocument } from "pdf-lib";
 import JSZip from "jszip";
-import { sanitize, uniqueName } from "./filename.js";
+import { composeFilename, uniqueName } from "./filename.js";
 
 // Build a ZIP blob containing one PDF per non-skipped bundle.
 // Each output PDF is built by copying the bundle's pages from the source.
@@ -16,8 +16,8 @@ export async function buildZip(srcBytes, liveBundles, prefix) {
     for (const p of copied) out.addPage(p);
     const bytes = await out.save();
 
-    const base = sanitize(b.address) || `bundle-${String(b.index + 1).padStart(2, "0")}`;
-    const name = uniqueName(used, `${prefix}${base}.pdf`);
+    const body = b.nameBody || `bundle-${String(b.index + 1).padStart(2, "0")}`;
+    const name = uniqueName(used, composeFilename(prefix, body));
     zip.file(name, bytes);
   }
 

@@ -77,7 +77,9 @@ The red-detection threshold is fixed at 55 in code. If real-world scans require 
 
 ## Output naming
 
-Sanitized address with the prefix and `.pdf` extension. Example: `LPTR-123-Main-St.pdf`. Duplicate filenames are silently suffixed `-2`, `-3`, etc.
+Per LPT AR procedure: `LPTR <Check Number> <Property Address>`, hyphenated for filesystem-friendliness. Example: `LPTR-462057-54023-Driftwood-Avenue.pdf`. Duplicate filenames are silently suffixed `-2`, `-3`, etc.
+
+If a check arrives without a detectable property address (e.g. random-company checks per AR's exception process), the address piece comes through blank — AR enters the property manually in the review screen, or skips the bundle for further research.
 
 ## Out of scope (intentionally)
 
@@ -91,10 +93,6 @@ Sanitized address with the prefix and `.pdf` extension. Example: `LPTR-123-Main-
 
 ## Testing
 
-A generated sample PDF lives at [tests/sample.pdf](tests/sample.pdf) (10 pages, 3 packets, two duplex red dividers, addresses including the multi-address case). Regenerate with:
-
-```bash
-python tests/generate_sample_pdf.py
-```
+The PDF generator under `tests/` is local-only and not committed (see [.gitignore](.gitignore)). It produces a synthetic batched PDF that mirrors a real LPT closing batch — useful for exercising red-page detection, multi-address fronts, and the various property-address label shapes without using customer data. If you need a fixture, ask the original author for a copy of the generator script or build your own.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for the build plan and step-by-step pipeline notes.

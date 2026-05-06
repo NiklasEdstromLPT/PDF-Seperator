@@ -1,5 +1,4 @@
 import { $ } from "./dom.js";
-import { sanitize } from "../pipeline/filename.js";
 
 // Render the review grid for the current state.bundles list.
 // onChange is called when the user edits a name or toggles skip — useful for any future side effects.
@@ -17,12 +16,18 @@ export function renderReview(state, onChange = () => {}) {
 }
 
 function buildCard(bundle, prefix, onChange) {
-  const card = el("div", "card" + (bundle.skipped ? " skipped" : ""));
+  const classes = ["card"];
+  if (bundle.skipped) classes.push("skipped");
+  if (!bundle.addressDetected && !bundle.skipped) classes.push("needs-review");
+  const card = el("div", classes.join(" "));
 
   const badges = el("div", "badges");
   const idx = el("span", "badge idx", "#" + String(bundle.index + 1).padStart(2, "0"));
   const pg = el("span", "badge", `${bundle.pages.length} pg`);
   badges.append(idx, pg);
+  if (bundle.checkNumber) {
+    badges.append(el("span", "badge check", `check ${bundle.checkNumber}`));
+  }
   card.appendChild(badges);
 
   const img = document.createElement("img");
@@ -35,11 +40,11 @@ function buildCard(bundle, prefix, onChange) {
   const lockL = el("span", "lock", prefix);
   const input = document.createElement("input");
   input.type = "text";
-  input.value = sanitize(bundle.address);
-  input.placeholder = "name";
+  input.value = bundle.nameBody || "";
+  input.placeholder = "check# address";
   input.spellcheck = false;
   input.addEventListener("input", () => {
-    bundle.address = input.value;
+    bundle.nameBody = input.value;
     onChange(bundle);
   });
   const lockR = el("span", "lock right", ".pdf");
@@ -50,7 +55,7 @@ function buildCard(bundle, prefix, onChange) {
   const pill = el(
     "span",
     "pill" + (bundle.addressDetected ? "" : " warn"),
-    bundle.addressDetected ? "address detected" : "address not auto-detected"
+    bundle.addressDetected ? "address detected" : "needs review — enter address"
   );
   status.appendChild(pill);
 

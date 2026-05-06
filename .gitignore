@@ -7,6 +7,10 @@ dist/
 __pycache__/
 *.pyc
 
+# Local-only sample data generators. Not part of the shipped tool.
+sample_check_generator/
+tests/
+
 # OS metadata
 .DS_Store
 Thumbs.db

@@ -260,9 +260,37 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
   display: flex;
   flex-direction: column;
   gap: 16px;
-  transition: opacity 120ms ease;
+  transition: opacity 120ms ease, border-color 120ms ease, background 120ms ease;
+  position: relative;
 }
 .card.skipped { opacity: 0.45; }
+
+/* Flagged: address could not be auto-detected — visually unmistakable. */
+.card.needs-review {
+  background: var(--warn-bg);
+  border-color: var(--warn);
+  border-width: 2px;
+  padding: 17px;  /* compensate for thicker border so layout stays put */
+}
+.card.needs-review::before {
+  content: "NEEDS REVIEW";
+  position: absolute;
+  top: -10px;
+  left: 14px;
+  background: var(--warn);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.card.needs-review .filename {
+  border-color: var(--warn);
+  background: #fff;
+}
+.card.needs-review.skipped::before { display: none; }
 
 .card .badges { display: flex; gap: 6px; align-items: center; }
 .badge {
@@ -275,6 +303,12 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
   color: var(--ink-soft);
 }
 .badge.idx { background: var(--ink); color: var(--bg-elev); border-color: var(--ink); }
+.badge.check {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
 
 .thumb {
   width: 100%;
@@ -338,7 +372,10 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
   background: var(--ok);
 }
 .status .pill.warn::before { background: var(--warn); }
-.status .pill.warn { color: var(--warn); }
+.status .pill.warn {
+  color: var(--warn);
+  font-weight: 600;
+}
 
 /* ===== Toast ===== */
 .toast {

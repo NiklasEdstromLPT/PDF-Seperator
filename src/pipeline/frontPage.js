@@ -2,6 +2,8 @@ import { createWorker } from "tesseract.js";
 import { yieldToUi } from "../ui/dom.js";
 import { setProgress } from "../ui/progress.js";
 import { extractAddress } from "./address.js";
+import { extractCheckNumber } from "./checkNumber.js";
+import { buildNameBody } from "./filename.js";
 
 // Thumbnails are kept in memory for the review screen only (session-scoped),
 // so render generously: 1.5x base, bumped to devicePixelRatio on retina/HiDPI
@@ -36,6 +38,7 @@ export async function processBundles(pdfDoc, groups) {
       front.cleanup();
 
       const address = extractAddress(text);
+      const checkNumber = extractCheckNumber(text);
 
       bundles.push({
         index: i,
@@ -43,6 +46,8 @@ export async function processBundles(pdfDoc, groups) {
         thumbnail,
         address,
         addressDetected: !!address,
+        checkNumber,
+        nameBody: buildNameBody(checkNumber, address),
         skipped: false,
       });
 

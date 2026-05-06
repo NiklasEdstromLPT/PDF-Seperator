@@ -57,17 +57,26 @@ Each milestone is independently testable — finish and verify one before moving
 - [x] If under ~30 non-whitespace chars, fall back to Tesseract on the OCR canvas.
 - [x] Reuse a single Tesseract worker across bundles; terminate when done.
 
-### Milestone 6 — Address extraction ✅
+### Milestone 6 — Address & check-number extraction ✅
 
-- [x] Regex: number + optional directional + 1–4 word street name + street type.
-- [x] Prefer matches that follow a "Property Address" / "Subject Property" / "Premises" / "Property Location" / "Site Address" label. This avoids picking up the title-company letterhead address at the top of front pages.
-- [x] Fall back to first-match-wins when no label is present.
-- [x] No match → blank, flagged in the UI.
+- [x] Address regex: number + optional directional + 1–4 word street name + street type. Street types include the standard set plus `Crossing`, `Park`, `Path`, `Walk`, `Pass`, `Glen`, `Heights`, `Manor`, `Bend`, `Ridge`, `Cove`, `Row` to cover real packet variants.
+- [x] Walk every label hit (`Property Address:`, `Property:`, `For:`, `Subject Property:`, `Property Location:`, `Site Address:`, `Premises:`) in document order. The colon is required so we don't catch "for example" or "property tax".
+- [x] For each label, scan only the next ~220 chars for an address pattern. The bounded window stops a corrupted label line from silently reaching across the page and pulling in some unrelated address.
+- [x] Reject candidates that match the LPT payee block (`1400 South International Parkway`, `Lake Mary, FL 32746`) — that address is on every check and would otherwise leak through occasionally.
+- [x] **No first-match-wins fallback.** If no labeled match in any window is valid, return blank. In real packets the first match is almost always the title-company letterhead at the top of the check, which is wrong; a blank result correctly flags the card for manual review and matches AR's "random company / no property address" exception process.
+- [x] Check number extracted from the `**** REAL ESTATE CLOSING **** <number>` banner that real LPT closing packets include. Falls back to the first plausible 4–8 digit run in the top of the page if the banner isn't there. Displayed as a badge on each review card next to the bundle index and page count.
+
+### Milestone 6.5 — Visual flagging when extraction fails ✅
+
+- [x] Card with `addressDetected === false` gets a `.needs-review` class. CSS gives it a thick warning-orange border, warm-tinted background, and a "NEEDS REVIEW" tag at the top-left of the card. Status pill text changes from "address not auto-detected" to the more directive "needs review — enter address" with bolder weight.
+- [x] Skipped cards suppress the NEEDS REVIEW tag (the skipped opacity is enough signal there).
 
 ### Milestone 7 — Filename construction ✅
 
 - [x] Sanitize: whitespace → `-`, strip non-alnum/`-`, collapse `-`, trim.
-- [x] Compose `${prefix}${sanitized}.pdf`.
+- [x] Naming convention per AR procedure: `LPTR <Check Number> <Property Address>`, hyphenated. Example: `LPTR-462057-54023-Driftwood-Avenue.pdf`. The check number and address are joined into a single editable name body on each review card so users can correct either piece in one input.
+- [x] All joining logic centralized in [src/pipeline/filename.js](src/pipeline/filename.js) (`sanitize`, `buildNameBody`, `composeFilename`, `uniqueName`) so swapping hyphens for spaces — or adopting any other convention — is a single-module edit.
+- [x] Empty pieces drop cleanly: missing address → `LPTR-462057.pdf`; missing check# → `LPTR-54023-Driftwood-Avenue.pdf`; both empty → `bundle-XX.pdf` fallback.
 
 ### Milestone 8 — Review UI ✅
 
@@ -101,8 +110,13 @@ Each milestone is independently testable — finish and verify one before moving
 
 ## Testing fixtures
 
-- [tests/sample.pdf](tests/sample.pdf) — 22 pages, 6 packets (page counts 2/3/1/2/1/3), duplex red dividers between every packet, every front page has the title-company letterhead AND a labeled "Property Address" line. Each property address uses a different shape (no directional, single-letter directional, two-letter directional, full directional word, multi-word street names, abbreviated and spelled-out street types) to exercise the regex broadly. First and last packets have no leading/trailing divider — covers the start-without-separator and end-without-separator edge cases. Regenerate with `python tests/generate_sample_pdf.py`.
-- TODO: a rasterized variant (no embedded text — forces the OCR path).
+The `tests/` directory and the `sample_check_generator/` directory are both gitignored (see [.gitignore](.gitignore)). Test fixtures are kept local-only — they're not part of the shipped tool and don't need to live in version control. Build your own batched PDF with red separator pages or use a real (redacted) batch when smoke-testing the pipeline.
+
+The synthetic generator that previously lived at `tests/generate_sample_pdf.py` produced 8 packets / 34 pages modeled on a real LPT closing batch — title-company letterhead, check-number banner, LPT payee block (which the regex must NOT pick up), and property address printed under one of `For:`, `Property:`, or `Property Address:` (rotated per packet so every label shape gets exercised). Useful pattern to recreate if you want repeatable test data.
+
+Things still worth covering whenever you build a fixture:
+- a rasterized variant (no embedded text — forces the OCR path)
+- a packet with corrupted / scrambled OCR text on one front page (exercises the "no labeled address → flag for review" path)
 
 ## After MVP (do not build yet)
 
