@@ -36,6 +36,7 @@ header.app {
   padding: 18px 32px;
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 18px;
   background: var(--bg-elev);
 }
@@ -233,25 +234,36 @@ main {
 }
 .confirm-btn {
   margin-left: auto;
-  background: var(--ok);
-  color: #fff;
-  border-color: var(--ok);
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
   font-weight: 600;
   font-size: 13px;
   padding: 6px 12px;
 }
 .confirm-btn:hover {
-  background: #2f5e3d;
-  border-color: #2f5e3d;
+  background: #2f4f4d;
+  border-color: #2f4f4d;
 }
 .confirm-btn.confirmed {
   background: var(--bg-elev);
-  color: var(--ok);
-  border-color: var(--ok);
+  color: var(--accent);
+  border-color: var(--accent);
   font-weight: 600;
 }
 .confirm-btn.confirmed:hover {
   background: var(--accent-soft);
+}
+
+.skip-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  color: var(--ink-soft);
+}
+.skip-btn:hover {
+  background: var(--bg);
+  border-color: var(--line-strong);
+  color: var(--ink);
 }
 
 button {
@@ -285,7 +297,9 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  /* min(380px, 100%) prevents horizontal overflow on narrow viewports —
+     when the container is narrower than 380px the column collapses to 100%. */
+  grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr));
   gap: 24px;
 }
 .card {
@@ -347,7 +361,7 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
   border-color: var(--bad);
 }
 
-.card .badges { display: flex; gap: 6px; align-items: center; }
+.card .badges { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .badge {
   font-family: var(--mono);
   font-size: 11px;
@@ -373,7 +387,36 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
   border-radius: 6px;
   object-fit: contain;
   display: block;
+  transition: filter 120ms ease;
 }
+
+.thumb-wrap {
+  position: relative;
+  cursor: zoom-in;
+}
+.thumb-wrap:hover .thumb { filter: brightness(0.85); }
+.zoom-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 56px;
+  height: 56px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.85);
+  transition: opacity 120ms ease, transform 120ms ease;
+  pointer-events: none;
+}
+.thumb-wrap:hover .zoom-icon {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.zoom-icon svg { width: 28px; height: 28px; }
 
 .filename {
   display: flex;
@@ -454,3 +497,71 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
   transform: translateX(-50%) translateY(0);
 }
 .toast.bad { background: var(--bad); }
+
+/* ===== Lightbox ===== */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 40px;
+  cursor: zoom-out;
+  animation: lightbox-fade 140ms ease;
+}
+.lightbox[hidden] { display: none; }
+.lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  cursor: zoom-out;
+}
+@keyframes lightbox-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 720px) {
+  header.app { padding: 14px 18px; gap: 12px; }
+  header.app h1 { font-size: 20px; }
+  main { padding: 24px 18px 60px; }
+
+  .drop { padding: 44px 20px; }
+  .drop h2 { font-size: 22px; }
+
+  .progress-wrap { padding: 22px; margin: 32px auto; }
+
+  .review-header {
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: 20px;
+  }
+  .review-actions { justify-content: flex-end; flex-wrap: wrap; }
+  .review-header h2 { font-size: 22px; }
+
+  .needs-count { font-size: 15px; padding: 10px 14px; margin: -4px 0 18px; }
+
+  .grid { gap: 18px; }
+  .card { padding: 16px; gap: 14px; }
+  .card.needs-review { padding: 15px; }
+  .card.needs-review.no-match { padding: 14px; }
+
+  .filename { font-size: 15px; }
+  .filename .lock, .filename input { padding: 10px; }
+
+  .lightbox { padding: 16px; }
+  .zoom-icon { width: 48px; height: 48px; }
+  .zoom-icon svg { width: 24px; height: 24px; }
+}
+
+@media (max-width: 420px) {
+  main { padding: 18px 12px 48px; }
+  header.app { padding: 12px 14px; }
+  .card { padding: 14px; }
+  .lightbox { padding: 8px; }
+}

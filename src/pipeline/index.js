@@ -47,7 +47,7 @@ export async function runPipeline(state) {
   if (groups.length === 0) {
     throw new PipelineError(
       "no-red-pages",
-      "No red separator pages found. Check that dividers are present and try lowering the red threshold."
+      "No Red Separator Pages Found. Check That Dividers Are Present and Try Lowering the Red Threshold."
     );
   }
 

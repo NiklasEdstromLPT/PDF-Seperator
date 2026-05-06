@@ -17,7 +17,7 @@ export function renderReview(state, onChange = () => {}) {
 
   const totalPages = state.bundles.reduce((s, b) => s + b.pages.length, 0);
   $("review-meta").textContent =
-    `${state.bundles.length} bundles · ${totalPages} pages total · click any name to edit`;
+    `${state.bundles.length} Bundles · ${totalPages} Pages Total · Click Any Name to Edit`;
 
   // Pairs are populated below; reorder/wrappedOnChange close over the outer
   // `cardPairs` ref so they see the fully-built array when first invoked.
@@ -91,7 +91,7 @@ function updateNeedsCount(bundles) {
   const n = countNeedsReview(bundles);
   el.hidden = n === 0;
   if (n === 0) return;
-  el.textContent = n === 1 ? "1 Bundle needs review" : `${n} bundles need review`;
+  el.textContent = n === 1 ? "1 Bundle Needs Review" : `${n} Bundles Need Review`;
 }
 
 function buildCard(bundle, prefix, onChange) {
@@ -102,18 +102,25 @@ function buildCard(bundle, prefix, onChange) {
 
   const badges = el("div", "badges");
   const idx = el("span", "badge idx", "#" + String(bundle.index + 1).padStart(2, "0"));
-  const pg = el("span", "badge", `${bundle.pages.length} pg`);
+  const pg = el("span", "badge", `${bundle.pages.length} Pg`);
   badges.append(idx, pg);
   if (bundle.checkNumber) {
-    badges.append(el("span", "badge check", `check ${bundle.checkNumber}`));
+    badges.append(el("span", "badge check", `Check# ${bundle.checkNumber}`));
   }
   card.appendChild(badges);
 
+  const thumbWrap = el("div", "thumb-wrap");
   const img = document.createElement("img");
   img.className = "thumb";
   img.alt = `Front page of bundle ${bundle.index + 1}`;
   img.src = bundle.thumbnail;
-  card.appendChild(img);
+  const zoomIcon = el("div", "zoom-icon");
+  zoomIcon.innerHTML =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+    '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>';
+  thumbWrap.append(img, zoomIcon);
+  thumbWrap.addEventListener("click", () => openLightbox(bundle.thumbnail, img.alt));
+  card.appendChild(thumbWrap);
 
   const fn = el("div", "filename");
   const lockL = el("span", "lock", prefix);
@@ -150,7 +157,7 @@ function buildCard(bundle, prefix, onChange) {
   }
 
   const skipBtn = document.createElement("button");
-  skipBtn.className = "subtle";
+  skipBtn.className = "skip-btn";
   skipBtn.addEventListener("click", () => {
     bundle.skipped = !bundle.skipped;
     applyReviewState();
@@ -183,7 +190,7 @@ function buildCard(bundle, prefix, onChange) {
       confirmBtn.classList.toggle("confirmed", !!bundle.reviewConfirmed);
     }
 
-    skipBtn.textContent = bundle.skipped ? "Restore" : "Skip";
+    skipBtn.textContent = bundle.skipped ? "Restore Bundle" : "Skip Bundle";
   }
   applyReviewState();
 
@@ -191,11 +198,11 @@ function buildCard(bundle, prefix, onChange) {
 }
 
 function pillTextFor(bundle) {
-  if (bundle.reviewConfirmed) return "approved";
+  if (bundle.reviewConfirmed) return "Approved";
   switch (bundle.addressConfidence) {
-    case "strong": return "address detected";
-    case "weak":   return "verify — unfamiliar suffix";
-    default:       return "needs review — enter address";
+    case "strong": return "Address Detected";
+    case "weak":   return "Verify — Unfamiliar Suffix";
+    default:       return "Needs Review — Enter Address";
   }
 }
 
@@ -204,4 +211,34 @@ function el(tag, className, text) {
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+// Lightbox: lazy-attaches its dismiss listeners (backdrop click + Escape) on
+// first open, so we don't pay for them until the user actually zooms a page.
+let lightboxReady = false;
+function ensureLightbox() {
+  if (lightboxReady) return;
+  const lb = $("lightbox");
+  if (!lb) return;
+  lb.addEventListener("click", () => closeLightbox());
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !lb.hidden) closeLightbox();
+  });
+  lightboxReady = true;
+}
+function openLightbox(src, alt) {
+  ensureLightbox();
+  const lb = $("lightbox");
+  const img = $("lightbox-img");
+  if (!lb || !img) return;
+  img.src = src;
+  img.alt = alt || "";
+  lb.hidden = false;
+}
+function closeLightbox() {
+  const lb = $("lightbox");
+  const img = $("lightbox-img");
+  if (!lb) return;
+  lb.hidden = true;
+  if (img) img.src = "";
 }
