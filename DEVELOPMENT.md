@@ -59,17 +59,33 @@ Each milestone is independently testable — finish and verify one before moving
 
 ### Milestone 6 — Address & check-number extraction ✅
 
-- [x] Address regex: number + optional directional + 1–4 word street name + street type. Street types include the standard set plus `Crossing`, `Park`, `Path`, `Walk`, `Pass`, `Glen`, `Heights`, `Manor`, `Bend`, `Ridge`, `Cove`, `Row` to cover real packet variants.
-- [x] Walk every label hit (`Property Address:`, `Property:`, `For:`, `Subject Property:`, `Property Location:`, `Site Address:`, `Premises:`) in document order. The colon is required so we don't catch "for example" or "property tax".
-- [x] For each label, scan only the next ~220 chars for an address pattern. The bounded window stops a corrupted label line from silently reaching across the page and pulling in some unrelated address.
-- [x] Reject candidates that match the LPT payee block (`1400 South International Parkway`, `Lake Mary, FL 32746`) — that address is on every check and would otherwise leak through occasionally.
-- [x] **No first-match-wins fallback.** If no labeled match in any window is valid, return blank. In real packets the first match is almost always the title-company letterhead at the top of the check, which is wrong; a blank result correctly flags the card for manual review and matches AR's "random company / no property address" exception process.
-- [x] Check number extracted from the `**** REAL ESTATE CLOSING **** <number>` banner that real LPT closing packets include. Falls back to the first plausible 4–8 digit run in the top of the page if the banner isn't there. Displayed as a badge on each review card next to the bundle index and page count.
+#### Address: three-tier extraction
 
-### Milestone 6.5 — Visual flagging when extraction fails ✅
+- [x] **Strict regex** (the existing one) requires a known suffix: `St, Street, Ave, Avenue, Rd, Road, Blvd, Boulevard, Dr, Drive, Ln, Lane, Ct, Court, Pl, Place, Way, Pkwy, Parkway, Hwy, Highway, Cir, Circle, Ter, Terrace, Trl, Trail, Loop, Plaza, Sq, Square, Run, Crossing, Park, Path, Walk, Pass, Glen, Heights, Manor, Bend, Ridge, Cove, Row`. Match → `{ confidence: "strong" }`. Covers ~95–97% of US addresses.
+- [x] **Loose regex** matches the same structural shape but accepts any capitalized word (≥3 chars) as the suffix slot. Catches `Sunrise`, `Meadow`, `Trace`, etc. without growing the strict list endlessly. Match → `{ confidence: "weak" }`.
+- [x] Loose stop-list rejects unit/floor words that look like suffixes by capitalization: `Apartment, Apt, Suite, Ste, Unit, Floor, Fl, Building, Bldg`. Stops "1234 Main Apartment" from soft-matching when the real suffix is missing.
+- [x] Walk every label hit (`Property Address:`, `Property:`, `For:`, `Subject Property:`, `Property Location:`, `Site Address:`, `Premises:`) in document order. Each label requires a colon. Try strict on every label first; only fall back to the best weak candidate if no strict match anywhere.
+- [x] For each label, scan only the next ~220 chars for an address pattern. The bounded window stops a corrupted label line from reaching across the page and pulling in some unrelated address.
+- [x] Reject any match (strict or loose) that's the LPT payee block (`1400 South International Parkway`, `Lake Mary, FL 32746`).
+- [x] **No first-match-wins fallback on the whole page.** If no labeled match in any window is valid, return `{ confidence: "none" }`. In real packets the first match is almost always the title-company letterhead at the top of the check, which is wrong.
+- [x] On the bundle, `addressDetected` is true ONLY for strong matches — weak and none both flag for human review through the existing `needsReview()` gate. `addressConfidence` carries the tier for visual differentiation only.
 
-- [x] Card with `addressDetected === false` gets a `.needs-review` class. CSS gives it a thick warning-orange border, warm-tinted background, and a "NEEDS REVIEW" tag at the top-left of the card. Status pill text changes from "address not auto-detected" to the more directive "needs review — enter address" with bolder weight.
-- [x] Skipped cards suppress the NEEDS REVIEW tag (the skipped opacity is enough signal there).
+#### Check number: position-ranked extraction
+
+- [x] **Tier 1 (banner regex):** `**** REAL ESTATE CLOSING **** <number>` on the full-page text. Reliable when present; returns immediately.
+- [x] **Tier 2 (position-ranked candidates):** collect every 4–7 digit run on the page that passes a strict negative-lookaround filter (no leading `$`/`-`/`/`/digit, no trailing digit/`-`/`/`). Sort by `(-x, -y)` — rightmost first, topmost as tiebreaker — and return the winner. On real checks the check# is the absolute top-right element; date prints below, dollar amount below the date, account/routing numbers in the MICR line at the bottom. Position-ranking picks the check# without a hardcoded crop region.
+- [x] Candidates come from `page.getTextContent().items` on the embedded-text path (positions read from `transform[4]/transform[5]`) or from `Tesseract.data.words` on the OCR fallback path (positions read from `bbox`, with y negated to match PDF.js's bottom-up convention so the same sort works for both).
+- [x] **Tier 3:** return `""` when no candidates pass the filter. Better to show no badge than a wrong one.
+- [x] Displayed as a badge on each review card next to the bundle index and page count.
+
+### Milestone 6.5 — Visual flagging when extraction is uncertain ✅
+
+- [x] Cards flow through `needsReview(b)` = `!skipped && !addressDetected && !reviewConfirmed`. Both weak and none tiers count as flagged because `addressDetected` is true only for strong.
+- [x] **Weak tier** (`addressConfidence === "weak"`): `.card.needs-review` class — amber/orange 2px border, "NEEDS REVIEW" tag, status pill reads "verify — unfamiliar suffix". User can ✓ Approve to clear if the loose match was right.
+- [x] **None tier** (`addressConfidence === "none"`): `.card.needs-review.no-match` adds a red 3px border, "ADDRESS REQUIRED" tag, status pill reads "needs review — enter address". Same Approve flow.
+- [x] **Strong tier**: no extra class, default green-dot pill ("address detected").
+- [x] Skipped cards suppress the tag in either tier.
+- [x] Top-of-screen counter (`X bundles need review`) + download-time confirm dialog (existing infrastructure) cover both flagged tiers automatically.
 
 ### Milestone 7 — Filename construction ✅
 

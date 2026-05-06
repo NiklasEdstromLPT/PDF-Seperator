@@ -2,6 +2,15 @@ import { $ } from "./dom.js";
 
 // Render the review grid for the current state.bundles list.
 // onChange is called when the user edits a name or toggles skip — useful for any future side effects.
+//
+// Cards are sorted by review priority — flagged ones (red, then amber) at the
+// top, everything else below. The sort is dynamic: when a user approves a
+// flagged card or skips one, the card slides down into its natural index
+// position among the unflagged cards. Same in reverse if they un-approve.
+//
+// Reorder works by moving existing DOM nodes (appendChild on already-built
+// cards) rather than rebuilding the grid, so input focus, scroll position,
+// and partially-typed text are preserved across the move.
 export function renderReview(state, onChange = () => {}) {
   const grid = $("grid");
   grid.innerHTML = "";
@@ -10,13 +19,46 @@ export function renderReview(state, onChange = () => {}) {
   $("review-meta").textContent =
     `${state.bundles.length} bundles · ${totalPages} pages total · click any name to edit`;
 
-  const updateCounter = () => updateNeedsCount(state.bundles);
-  const wrappedOnChange = (b) => { onChange(b); updateCounter(); };
+  // Pairs are populated below; reorder/wrappedOnChange close over the outer
+  // `cardPairs` ref so they see the fully-built array when first invoked.
+  let cardPairs = [];
 
-  for (const b of state.bundles) {
-    grid.appendChild(buildCard(b, state.prefix, wrappedOnChange));
-  }
+  const reorder = () => {
+    [...cardPairs]
+      .sort((a, b) => byReviewPriority(a.bundle, b.bundle))
+      .forEach(({ card }) => grid.appendChild(card));
+  };
+
+  const updateCounter = () => updateNeedsCount(state.bundles);
+  const wrappedOnChange = (b) => {
+    onChange(b);
+    updateCounter();
+    reorder();
+  };
+
+  cardPairs = state.bundles.map((b) => ({
+    bundle: b,
+    card: buildCard(b, state.prefix, wrappedOnChange),
+  }));
+
+  reorder();
   updateCounter();
+}
+
+// Sort priority for the review grid:
+//   0 — needs review, no auto-detected address (red, "ADDRESS REQUIRED")
+//   1 — needs review, weak/loose match (amber, "verify — unfamiliar suffix")
+//   2 — everything else: strong-detected, approved, or skipped
+// Within each bucket, original packet order (bundle.index) is preserved.
+function byReviewPriority(a, b) {
+  const ka = reviewBucket(a);
+  const kb = reviewBucket(b);
+  if (ka !== kb) return ka - kb;
+  return a.index - b.index;
+}
+function reviewBucket(b) {
+  if (!needsReview(b)) return 2;
+  return b.addressConfidence === "none" ? 0 : 1;
 }
 
 // Whether a bundle is still flagged for human review.
@@ -108,15 +150,17 @@ function buildCard(bundle, prefix, onChange) {
   // card's review/skip CSS classes. Called once at build and again on every
   // confirm/skip toggle so the same logic owns initial render and updates.
   function applyReviewState() {
-    card.classList.toggle("skipped", bundle.skipped);
-    card.classList.toggle("needs-review", needsReview(bundle));
+    const flagged = needsReview(bundle);
+    const noMatch = bundle.addressConfidence === "none";
 
-    pill.classList.toggle("warn", needsReview(bundle));
-    pill.textContent = bundle.addressDetected
-      ? "address detected"
-      : bundle.reviewConfirmed
-        ? "approved"
-        : "needs review";
+    card.classList.toggle("skipped", bundle.skipped);
+    card.classList.toggle("needs-review", flagged);
+    // Red modifier for the "no plausible address found" tier; the default
+    // needs-review styling stays amber for the weak (verify) tier.
+    card.classList.toggle("no-match", flagged && noMatch);
+
+    pill.classList.toggle("warn", flagged);
+    pill.textContent = pillTextFor(bundle);
 
     if (confirmBtn) {
       confirmBtn.textContent = bundle.reviewConfirmed ? "✓ Approved" : "✓ Approve";
@@ -131,6 +175,15 @@ function buildCard(bundle, prefix, onChange) {
   applyReviewState();
 
   return card;
+}
+
+function pillTextFor(bundle) {
+  if (bundle.reviewConfirmed) return "approved";
+  switch (bundle.addressConfidence) {
+    case "strong": return "address detected";
+    case "weak":   return "verify — unfamiliar suffix";
+    default:       return "needs review — enter address";
+  }
 }
 
 function el(tag, className, text) {

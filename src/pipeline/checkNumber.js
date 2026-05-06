@@ -1,30 +1,46 @@
 // Check number extraction.
 //
-// Real packet front pages always carry a check number in two places: the top-right
-// of the check itself, and immediately after the "**** REAL ESTATE CLOSING ****"
-// banner in the closing summary. The banner form is the most reliable signal
-// because it isolates the number from surrounding noise (the dollar amount,
-// page numbers, escrow IDs, etc. all look like 4–8 digit numbers too).
+// Tier 1: banner regex on the full page text. Real LPT closing packets carry
+//   "**** REAL ESTATE CLOSING **** <number>" in the closing summary; when
+//   present that's the most reliable signal there is.
 //
-// Tries the banner form first; if that fails, falls back to a stand-alone digit
-// run near the top of the text. Returns "" when nothing plausible is found.
+// Tier 2: position-ranked candidate selection. The check# always prints as the
+//   absolute top-right element on a check — date sits below it, dollar amount
+//   below the date, account/routing numbers far below in the MICR line. Sort
+//   candidate digit runs by (-x, -y) (rightmost first, topmost as tiebreaker)
+//   and the check# wins. Independent of page size and check position.
+//
+// Tier 3: return "" when no candidates at all.
+//
+// The tier-2 candidates are built upstream in frontPage.js with positional
+// metadata from PDF.js (getTextContent items) or Tesseract (data.words).
 
 const BANNER_RE = /\*+\s*REAL\s*ESTATE\s*CLOSING\s*\*+\s*(\d{3,8})\b/i;
 
-// Loose fallback: a 4–8 digit run that's NOT preceded by "$", ".", "-", "/" or
-// followed by another digit (so we skip dollar amounts and dates).
-const LOOSE_RE = /(?<![$.\-\/\d])(\d{4,8})(?!\d|[\-\/])/;
+// Strict digit filter: 4-7 digit run, NOT preceded by $, ., -, /, or another
+// digit, and NOT followed by another digit, -, or /. Filters out dollar
+// amounts, dates, escrow fragments, account-number fragments, and zip codes.
+const CANDIDATE_RE = /(?<![$.\-\/\d])(\d{4,7})(?!\d|[\-\/])/;
 
-export function extractCheckNumber(text) {
-  if (!text) return "";
+export function extractCheckNumber(fullText, candidates = []) {
+  if (fullText) {
+    const banner = fullText.match(BANNER_RE);
+    if (banner) return banner[1];
+  }
 
-  const banner = text.match(BANNER_RE);
-  if (banner) return banner[1];
+  if (candidates.length === 0) return "";
 
-  // Look in just the first ~600 chars — the check number prints near the top.
-  // This keeps us from grabbing escrow numbers ("Escrow Number: 77-8219-238")
-  // or dollar amounts ("$13,741.19") farther down the page.
-  const head = text.slice(0, 600);
-  const loose = head.match(LOOSE_RE);
-  return loose ? loose[1] : "";
+  // Rightmost-first, topmost as tiebreaker.
+  // Both x and y are normalized so higher = rightward / upward respectively.
+  const ranked = [...candidates].sort((a, b) => b.x - a.x || b.y - a.y);
+  return ranked[0].value;
+}
+
+// Helper for callers building the candidates array: returns the first valid
+// 4-7 digit run inside the given string, or null. Used by frontPage.js to
+// extract candidates from individual PDF.js text items / Tesseract words.
+export function findCandidateInString(s) {
+  if (!s) return null;
+  const m = s.match(CANDIDATE_RE);
+  return m ? m[1] : null;
 }

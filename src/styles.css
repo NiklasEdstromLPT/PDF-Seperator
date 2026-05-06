@@ -10,8 +10,10 @@
   --accent-ink: #ffffff;
   --accent-soft: #e6efee;
   --warn: #b06b1a;
+  --warn-bg: #fdf3e3;
   --ok: #3f7a4f;
   --bad: #a13a2c;
+  --bad-bg: #fbe8e3;
   --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -326,6 +328,24 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
   background: #fff;
 }
 .card.needs-review.skipped::before { display: none; }
+
+/* Stronger "no plausible address found" tier — red instead of amber, 3px
+   border, more directive tag text. The bare .needs-review styling above still
+   applies for the weak (verify) tier where the regex matched a structural
+   address with an unfamiliar suffix. */
+.card.needs-review.no-match {
+  background: var(--bad-bg);
+  border-color: var(--bad);
+  border-width: 3px;
+  padding: 16px; /* keep layout footprint stable across border widths */
+}
+.card.needs-review.no-match::before {
+  content: "ADDRESS REQUIRED";
+  background: var(--bad);
+}
+.card.needs-review.no-match .filename {
+  border-color: var(--bad);
+}
 
 .card .badges { display: flex; gap: 6px; align-items: center; }
 .badge {
