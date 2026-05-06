@@ -5,7 +5,13 @@
       "Bash(python generate_fake_packets.py 18 ./sample_checks --bundle --malformed-pct 60)",
       "Bash(rm -rf dist)",
       "Bash(VITE_BASE=/PDF-Seperator/ npm run build)",
-      "Bash(MSYS_NO_PATHCONV=1 VITE_BASE=/PDF-Seperator/ npm run build)"
+      "Bash(MSYS_NO_PATHCONV=1 VITE_BASE=/PDF-Seperator/ npm run build)",
+      "Bash(curl -s \"https://niklasedstromlpt.github.io/PDF-Seperator/\")",
+      "Bash(curl -s -o /dev/null -w \"src/styles.css %{http_code}\\\\nsrc/main.js  %{http_code}\\\\n\" \"https://niklasedstromlpt.github.io/PDF-Seperator/src/styles.css\" -o /dev/null -w \"src/styles.css %{http_code}\\\\n\" \"https://niklasedstromlpt.github.io/PDF-Seperator/src/styles.css\")",
+      "Bash(curl -s -o /dev/null -w \"src/main.js   %{http_code}\\\\n\" \"https://niklasedstromlpt.github.io/PDF-Seperator/src/main.js\")",
+      "Bash(curl -sI \"https://niklasedstromlpt.github.io/PDF-Seperator/src/styles.css\")",
+      "Bash(curl -s \"https://niklasedstromlpt.github.io/PDF-Seperator/src/styles.css\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} - %{url_effective}\\\\n\" \"https://niklasedstromlpt.github.io/src/styles.css\" \"https://niklasedstromlpt.github.io/src/main.js\")"
     ]
   }
 }
