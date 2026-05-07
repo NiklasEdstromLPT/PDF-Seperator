@@ -61,7 +61,8 @@ export function renderReview(state, onChange = () => {}) {
 // Sort priority for the review grid:
 //   0 — needs review, no auto-detected address (red, "ADDRESS REQUIRED")
 //   1 — needs review, weak/loose match (amber, "verify — unfamiliar suffix")
-//   2 — everything else: strong-detected, approved, or skipped
+//   2 — auto-detected (strong) but pending the user's approval click
+//   3 — done: approved or skipped
 // Within each bucket, original packet order (bundle.index) is preserved.
 function byReviewPriority(a, b) {
   const ka = reviewBucket(a);
@@ -70,28 +71,59 @@ function byReviewPriority(a, b) {
   return a.index - b.index;
 }
 function reviewBucket(b) {
-  if (!needsReview(b)) return 2;
-  return b.addressConfidence === "none" ? 0 : 1;
+  if (b.skipped || b.reviewConfirmed) return 3;
+  if (b.addressConfidence === "none") return 0;
+  if (b.addressConfidence === "weak") return 1;
+  return 2;
 }
 
-// Whether a bundle is still flagged for human review.
-// A bundle escapes review when it had an auto-detected address, was manually
-// confirmed via the checkmark, or was skipped (excluded from output).
+// Two related but distinct flags:
+//   needsReview   — auto-detection failed or was weak (red/amber border)
+//   needsApproval — user hasn't clicked Approve yet (regardless of detection)
+//
+// Every non-skipped bundle requires explicit approval before it ships in the
+// ZIP. This forces eyes onto every card and prevents the "system says strong,
+// user trusts it, false-positive ships" failure mode. needsReview stays
+// narrower because only flagged cards get the warning styling.
 export function needsReview(b) {
   return !b.skipped && !b.addressDetected && !b.reviewConfirmed;
+}
+export function needsApproval(b) {
+  return !b.skipped && !b.reviewConfirmed;
 }
 
 export function countNeedsReview(bundles) {
   return bundles.filter(needsReview).length;
 }
+export function countNeedsApproval(bundles) {
+  return bundles.filter(needsApproval).length;
+}
 
 function updateNeedsCount(bundles) {
-  const el = $("review-needs-count");
-  if (!el) return;
-  const n = countNeedsReview(bundles);
-  el.hidden = n === 0;
-  if (n === 0) return;
-  el.textContent = n === 1 ? "1 Bundle Needs Review" : `${n} Bundles Need Review`;
+  const pendingEl = $("pending-approval-count");
+  const reviewEl = $("review-needs-count");
+
+  // Union vs subset: the pending banner counts every non-skipped,
+  // unapproved bundle (including the flagged ones — a flagged bundle is
+  // also "pending approval"). The review banner is the flagged subset.
+  // Card classes stay mutually exclusive so a flagged card shows orange,
+  // not yellow, but the headline number is the total to-do count.
+  const pending = countNeedsApproval(bundles);
+  const flagged = countNeedsReview(bundles);
+
+  if (pendingEl) {
+    pendingEl.hidden = pending === 0;
+    pendingEl.textContent =
+      pending === 1 ? "1 Bundle Pending Approval" : `${pending} Bundles Pending Approval`;
+  }
+
+  if (reviewEl) {
+    reviewEl.hidden = flagged === 0;
+    reviewEl.textContent =
+      flagged === 1
+        ? "1 Bundle Needs Critical Review"
+        : `${flagged} Bundles Need Critical Review`;
+  }
 }
 
 function buildCard(bundle, prefix, onChange) {
@@ -141,11 +173,12 @@ function buildCard(bundle, prefix, onChange) {
   const pill = el("span", "pill");
   status.appendChild(pill);
 
-  // Manual-confirm button: only meaningful when the bundle wasn't auto-detected
-  // and isn't skipped. Clicking it flips reviewConfirmed so the card leaves the
-  // needs-review pool (and the top-of-screen counter ticks down).
+  // Approve button: every non-skipped bundle requires an explicit approval
+  // click before it ships, including auto-detected ones. Clicking flips
+  // reviewConfirmed so the card drops out of the pending-approval pool and
+  // (if it was flagged) the needs-review pool too.
   let confirmBtn = null;
-  if (!bundle.addressDetected && !bundle.skipped) {
+  if (!bundle.skipped) {
     confirmBtn = document.createElement("button");
     confirmBtn.className = "confirm-btn";
     confirmBtn.addEventListener("click", () => {
@@ -172,9 +205,14 @@ function buildCard(bundle, prefix, onChange) {
   function applyReviewState() {
     const flagged = needsReview(bundle);
     const noMatch = bundle.addressConfidence === "none";
+    // Yellow tier: auto-detected but still awaiting the user's Approve
+    // click. Mutually exclusive with `flagged` — a card is either pending
+    // (yellow), flagged (amber/red), or done (no class).
+    const pending = !flagged && needsApproval(bundle);
 
     card.classList.toggle("skipped", bundle.skipped);
     card.classList.toggle("needs-review", flagged);
+    card.classList.toggle("pending-approval", pending);
     // Red modifier for the "no plausible address found" tier; the default
     // needs-review styling stays amber for the weak (verify) tier.
     card.classList.toggle("no-match", flagged && noMatch);

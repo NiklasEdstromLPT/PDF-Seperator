@@ -225,12 +225,19 @@ main {
   font-size: 17px;
   font-weight: 700;
   color: var(--warn);
-  margin: -8px 0 22px;
+  margin: 0 0 16px;
   padding: 12px 16px;
-  background: #fdf3e3;
+  background: var(--warn-bg);
   border: 1px solid var(--warn);
   border-left-width: 4px;
   border-radius: 6px;
+}
+/* Lighter, less-urgent yellow tier for "pending approval" — auto-detected
+   bundles that just need the user's explicit ack before shipping. */
+.needs-count.pending {
+  color: #8a6e0a;
+  background: #fff7d6;
+  border-color: #c89c1a;
 }
 .confirm-btn {
   margin-left: auto;
@@ -342,6 +349,33 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
   background: #fff;
 }
 .card.needs-review.skipped::before { display: none; }
+
+/* Pending approval: auto-detected addresses still awaiting an explicit user
+   click before they ship. Light-yellow tier — visually subordinate to the
+   amber "needs review" / red "address required" tiers, but still clearly
+   "an action item" rather than "done". Border + corner tag mirror the
+   needs-review treatment so users learn one visual language. */
+.card.pending-approval {
+  background: #fff7d6;
+  border-color: #c89c1a;
+  border-width: 2px;
+  padding: 17px;
+}
+.card.pending-approval::before {
+  content: "PENDING APPROVAL";
+  position: absolute;
+  top: -10px;
+  left: 14px;
+  background: #c89c1a;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.card.pending-approval.skipped::before { display: none; }
 
 /* Stronger "no plausible address found" tier — red instead of amber, 3px
    border, more directive tag text. The bare .needs-review styling above still
