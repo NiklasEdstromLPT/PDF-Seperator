@@ -25,7 +25,7 @@
     <div class="settings">
       <div>
         <label for="prefix">Filename prefix</label>
-        <input type="text" id="prefix" value="LPTR-" />
+        <input type="text" id="prefix" value="LPTR." />
         <div class="help">Prepended to every output file.</div>
       </div>
     </div>
@@ -66,7 +66,9 @@
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <div id="lightbox" class="lightbox" hidden role="dialog" aria-label="Page preview">
-  <img id="lightbox-img" alt="" />
+  <div id="lightbox-wrap" class="lightbox-wrap">
+    <img id="lightbox-img" alt="" />
+  </div>
 </div>
 
 <script type="module" src="/src/main.js"></script>

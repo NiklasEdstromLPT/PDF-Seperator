@@ -11,7 +11,14 @@
       "Bash(curl -s -o /dev/null -w \"src/main.js   %{http_code}\\\\n\" \"https://niklasedstromlpt.github.io/PDF-Seperator/src/main.js\")",
       "Bash(curl -sI \"https://niklasedstromlpt.github.io/PDF-Seperator/src/styles.css\")",
       "Bash(curl -s \"https://niklasedstromlpt.github.io/PDF-Seperator/src/styles.css\")",
-      "Bash(curl -s -o /dev/null -w \"%{http_code} - %{url_effective}\\\\n\" \"https://niklasedstromlpt.github.io/src/styles.css\" \"https://niklasedstromlpt.github.io/src/main.js\")"
+      "Bash(curl -s -o /dev/null -w \"%{http_code} - %{url_effective}\\\\n\" \"https://niklasedstromlpt.github.io/src/styles.css\" \"https://niklasedstromlpt.github.io/src/main.js\")",
+      "Bash(npm test *)",
+      "Bash(python tests/generate_sample_pdf.py)",
+      "Bash(node --input-type=module -e ' *)",
+      "Bash(python -c ' *)",
+      "Bash(git restore *)",
+      "Bash(git check-ignore *)",
+      "Bash(python generate_fake_packets.py 20 ./fake_packets --bundle)"
     ]
   }
 }

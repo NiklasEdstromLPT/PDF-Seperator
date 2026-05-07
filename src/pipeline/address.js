@@ -53,16 +53,55 @@ const LOOSE_ADDR_RE = new RegExp(
     String.raw`[A-Z][a-z]{2,})\b\.?`
 );
 
-// Words that look like a "suffix" by capitalization but actually mean unit/floor —
-// don't accept them as a weak match (otherwise "1234 Main Apartment" looks like
-// a complete address when it's just missing the real suffix).
+// Words that look like a "suffix" by capitalization but actually mean unit/floor,
+// or are closing-summary labels that sit on the line right after the address —
+// don't accept them as a weak match (otherwise "1234 Main Apartment" or
+// "1234 Pear Mews Memo" looks like a complete address when it's actually
+// missing the real suffix and bleeding into the next field).
 const LOOSE_STOP_LIST = new Set([
   "apartment", "apt",
   "suite", "ste",
   "unit",
   "floor", "fl",
   "building", "bldg",
+  // Closing-summary labels — when the address line lacks a known suffix,
+  // PDF text concatenation can paste the next line's label word right after.
+  "memo", "address", "buyer", "borrower", "seller", "lender",
+  "settlement", "disbursement", "property", "description", "page",
+  "check", "pay", "lpt",
 ]);
+
+// Suffixes used to detect the "Drive St. Louis" trap in fixDoubleSuffix below.
+// Only the unambiguous full-word and short-form street types — intentionally
+// excludes midword-friendly types like Glen / Park / Run / Bend / Ridge / Cove
+// (since "Autumn Glen Lane" is a legitimate address that shouldn't trigger).
+const TWO_SUFFIX_PREV_SET = new Set([
+  "street", "st",
+  "avenue", "ave", "av",
+  "road", "rd",
+  "boulevard", "blvd",
+  "drive", "dr",
+  "lane", "ln",
+  "court", "ct",
+  "place", "pl",
+  "way",
+  "parkway", "pkwy",
+  "highway", "hwy",
+  "circle", "cir",
+  "terrace", "ter",
+  "trail", "trl",
+  "plaza",
+  "square", "sq",
+]);
+
+// Trailing tokens that are almost always city-prefix abbreviations (Saint Louis,
+// Mount Olive, Fort Wayne) when they show up right after a real street suffix.
+const TWO_SUFFIX_LAST_SET = new Set(["st", "ste", "mt", "ft", "sta"]);
+
+// Closing-summary labels that follow the property address. Used to truncate
+// the slice so the regex can't reach past them onto the next field.
+const NEXT_LABEL_RE =
+  /\s+(?:memo|buyer\/borrower|borrower|seller|lender|settlement\s+date|disbursement\s+date|check\s+amount|pay\s+to|property\s+address|property|description|page|for)\s*:/i;
 
 // Property-address labels — order matters: most-specific multi-word forms
 // FIRST so the regex engine matches them before their shorter prefixes
@@ -113,12 +152,15 @@ function scanWithLabels(text, labelRe) {
 
   for (const label of text.matchAll(labelRe)) {
     const start = label.index + label[0].length;
-    const slice = text.slice(start, start + LABEL_WINDOW);
+    const rawSlice = text.slice(start, start + LABEL_WINDOW);
+    // Stop the slice at the next closing-summary label so multi-line addresses
+    // can't bleed onto the next field (e.g. address line 2 + "Memo:").
+    const slice = trimAtNextLabel(rawSlice);
 
     // Try strict first — if any label produces a strong match, we're done.
     const strict = slice.match(STRICT_ADDR_RE);
     if (strict) {
-      const candidate = clean(strict[1]);
+      const candidate = fixDoubleSuffix(clean(strict[1]));
       if (!isKnownPayee(candidate)) {
         return { value: candidate, confidence: "strong" };
       }
@@ -139,6 +181,28 @@ function scanWithLabels(text, labelRe) {
   }
 
   return bestWeak || NONE;
+}
+
+function trimAtNextLabel(slice) {
+  const idx = slice.search(NEXT_LABEL_RE);
+  return idx > 0 ? slice.slice(0, idx) : slice;
+}
+
+// Strip a trailing one-word "suffix" that's actually a city-prefix abbreviation.
+// Triggers only when the captured address ends in St/Ste/Mt/Ft AND the word
+// just before it is itself a real street suffix — that combination almost
+// always means the regex grabbed "Drive St. Louis" or "Lane Mt. Olive" and
+// included the city prefix by mistake. "Autumn Glen Lane" is safe because
+// the prev-word check excludes ambiguous midword tokens like Glen.
+function fixDoubleSuffix(addr) {
+  const words = addr.trim().split(/\s+/);
+  if (words.length < 4) return addr;
+  const last = words[words.length - 1].toLowerCase().replace(/\.$/, "");
+  const prev = words[words.length - 2].toLowerCase().replace(/\.$/, "");
+  if (TWO_SUFFIX_LAST_SET.has(last) && TWO_SUFFIX_PREV_SET.has(prev)) {
+    return words.slice(0, -1).join(" ");
+  }
+  return addr;
 }
 
 function isKnownPayee(addr) {

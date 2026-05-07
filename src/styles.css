@@ -239,8 +239,12 @@ main {
   background: #fff7d6;
   border-color: #c89c1a;
 }
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .confirm-btn {
-  margin-left: auto;
   background: var(--accent);
   color: var(--accent-ink);
   border-color: var(--accent);
@@ -304,10 +308,26 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
 
 .grid {
   display: grid;
-  /* min(380px, 100%) prevents horizontal overflow on narrow viewports —
-     when the container is narrower than 380px the column collapses to 100%. */
-  grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr));
+  /* Column width is capped at the same per-card max as the card itself, but
+     it shrinks to fit narrower viewports. Sizing the column == the card
+     means each card fills its cell edge-to-edge, so the visible space
+     between adjacent cards in 2-column mode is just `gap` (24px) — matching
+     the row gap. justify-content:center pushes any leftover horizontal
+     space out of the grid as a whole rather than inside individual cells,
+     which is what was making the column gap look bigger than the row gap.
+     --card-cap is the viewport-height-based cap (see .card below). */
+  --card-cap: calc(60vh * 8.5 / 11 + 36px);
+  grid-template-columns: minmax(0, var(--card-cap));
   gap: 24px;
+  justify-content: center;
+}
+/* Hold 1-column all the way through tablet-landscape and small-laptop
+   widths. Below 1280px we keep one centered card with growing side margins
+   rather than squeezing two cards in. */
+@media (min-width: 1280px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, var(--card-cap)));
+  }
 }
 .card {
   background: var(--bg-elev);
@@ -320,6 +340,15 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
   gap: 16px;
   transition: opacity 120ms ease, border-color 120ms ease, background 120ms ease;
   position: relative;
+  width: 100%;
+  /* Hard cap so a single review never grows taller than the visible page —
+     the user shouldn't have to scroll up and down to take in one card. The
+     thumbnail (8.5:11 portrait page) dominates the card height, so we cap
+     the card width such that thumb height stays around 60vh; the +36px
+     accounts for the card's horizontal padding on either side. Redundant
+     with the grid's column cap above but kept as belt-and-suspenders for
+     anywhere a card renders outside the grid. */
+  max-width: calc(60vh * 8.5 / 11 + 36px);
 }
 .card.skipped { opacity: 0.45; }
 
@@ -429,6 +458,19 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
   cursor: zoom-in;
 }
 .thumb-wrap:hover .thumb { filter: brightness(0.85); }
+
+/* Highlighter overlay marks — translucent yellow rectangles positioned with
+   page-percent coordinates so they scale with the thumbnail/lightbox. The
+   `multiply` blend mode darkens the underlying ink the way a real highlighter
+   pen does, instead of just pasting an opaque yellow box on top.
+   pointer-events:none keeps the click-to-zoom behavior on the wrapper. */
+.highlight {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(252, 211, 77, 0.55);
+  mix-blend-mode: multiply;
+  border-radius: 2px;
+}
 .zoom-icon {
   position: absolute;
   top: 50%;
@@ -546,13 +588,42 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
   animation: lightbox-fade 140ms ease;
 }
 .lightbox[hidden] { display: none; }
+/* Wrap shrinks to the actual rendered image size so the highlighter overlay
+   marks (positioned with %), which need to anchor to the image edges, line up
+   with the visible image rather than the full lightbox backdrop. inline-block
+   + line-height:0 means the wrap's size IS the <img>'s rendered size with
+   no extra whitespace below from inline baseline alignment. */
+.lightbox-wrap {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+/* Cap the rendered image to the lightbox's content area (viewport minus the
+   .lightbox 40px padding). Crucially, no object-fit:contain — that would keep
+   the <img> element's outer box at the cap dimensions and letterbox the image
+   content inside, which would then break our percent-based highlight overlay
+   anchoring. With max-width/max-height alone, the browser scales the element
+   itself to fit while preserving aspect ratio, so the box and the visible
+   image are the same rectangle. */
 .lightbox img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+  display: block;
+  max-width: calc(100vw - 80px);
+  max-height: calc(100vh - 80px);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   border-radius: 4px;
   cursor: zoom-out;
+}
+@media (max-width: 720px) {
+  .lightbox img {
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px);
+  }
+}
+@media (max-width: 420px) {
+  .lightbox img {
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+  }
 }
 @keyframes lightbox-fade {
   from { opacity: 0; }

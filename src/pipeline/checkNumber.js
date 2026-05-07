@@ -19,15 +19,22 @@
 // serials (8-10), and money-order serials (11-12 — USPS / Western Union money
 // orders use 11-digit serial numbers). 12 is the upper bound: anything longer
 // is almost certainly an account or routing number, not a check / MO serial.
-const BANNER_RE = /\*+\s*REAL\s*ESTATE\s*CLOSING\s*\*+\s*(\d{3,12})\b/i;
+//
+// The "NN-NNNNNNNNNN" alternative is for some bank-issued business / corporate
+// checks that print the check# as a 2-digit branch/prefix, a hyphen, and a
+// 10-digit serial (13 chars total).
+const BANNER_RE = /\*+\s*REAL\s*ESTATE\s*CLOSING\s*\*+\s*(\d{2}-\d{10}|\d{3,12})\b/i;
 
-// Strict digit filter: 4-12 digit run, NOT preceded by $, ., -, /, or another
-// digit, and NOT followed by another digit, -, or /. Filters out dollar
-// amounts, dates, escrow fragments, and adjacent-digit fragments of longer
-// numbers. The negative-digit lookarounds matter most for the upper end —
-// they prevent us from accidentally extracting a 12-digit prefix or suffix
-// of a 13+ digit account number.
-const CANDIDATE_RE = /(?<![$.\-\/\d])(\d{4,12})(?!\d|[\-\/])/;
+// Strict digit filter: 4-12 digit run OR the "NN-NNNNNNNNNN" prefixed format,
+// NOT preceded by $, ., -, /, or another digit, and NOT followed by another
+// digit, -, or /. Filters out dollar amounts, dates, escrow fragments, and
+// adjacent-digit fragments of longer numbers. The negative-digit lookarounds
+// matter most for the upper end — they prevent us from accidentally extracting
+// a 12-digit prefix or suffix of a 13+ digit account number.
+//
+// The hyphenated alternative is listed first so it wins over a plain 4-digit
+// match on the leading "NN" of an "NN-NNNNNNNNNN" check#.
+const CANDIDATE_RE = /(?<![$.\-\/\d])(\d{2}-\d{10}|\d{4,12})(?!\d|[\-\/])/;
 
 export function extractCheckNumber(fullText, candidates = []) {
   if (fullText) {

@@ -146,12 +146,21 @@ function buildCard(bundle, prefix, onChange) {
   img.className = "thumb";
   img.alt = `Front page of bundle ${bundle.index + 1}`;
   img.src = bundle.thumbnail;
+  thumbWrap.appendChild(img);
+  // Highlighter overlay marks on the thumbnail showing where the auto-detected
+  // check# and address came from on the page. DOM-only — never reaches the
+  // exported PDF in the ZIP.
+  for (const mark of buildHighlightMarks(bundle.highlights)) {
+    thumbWrap.appendChild(mark);
+  }
   const zoomIcon = el("div", "zoom-icon");
   zoomIcon.innerHTML =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
     '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>';
-  thumbWrap.append(img, zoomIcon);
-  thumbWrap.addEventListener("click", () => openLightbox(bundle.thumbnail, img.alt));
+  thumbWrap.appendChild(zoomIcon);
+  thumbWrap.addEventListener("click", () =>
+    openLightbox(bundle.thumbnail, img.alt, bundle.highlights),
+  );
   card.appendChild(thumbWrap);
 
   const fn = el("div", "filename");
@@ -173,10 +182,22 @@ function buildCard(bundle, prefix, onChange) {
   const pill = el("span", "pill");
   status.appendChild(pill);
 
+  const actions = el("div", "card-actions");
+
+  const skipBtn = document.createElement("button");
+  skipBtn.className = "skip-btn";
+  skipBtn.addEventListener("click", () => {
+    bundle.skipped = !bundle.skipped;
+    applyReviewState();
+    onChange(bundle);
+  });
+  actions.appendChild(skipBtn);
+
   // Approve button: every non-skipped bundle requires an explicit approval
   // click before it ships, including auto-detected ones. Clicking flips
   // reviewConfirmed so the card drops out of the pending-approval pool and
-  // (if it was flagged) the needs-review pool too.
+  // (if it was flagged) the needs-review pool too. Lives in the bottom-right
+  // of the card so it's the last thing the user's eye lands on.
   let confirmBtn = null;
   if (!bundle.skipped) {
     confirmBtn = document.createElement("button");
@@ -186,17 +207,10 @@ function buildCard(bundle, prefix, onChange) {
       applyReviewState();
       onChange(bundle);
     });
-    badges.appendChild(confirmBtn);
+    actions.appendChild(confirmBtn);
   }
 
-  const skipBtn = document.createElement("button");
-  skipBtn.className = "skip-btn";
-  skipBtn.addEventListener("click", () => {
-    bundle.skipped = !bundle.skipped;
-    applyReviewState();
-    onChange(bundle);
-  });
-  status.appendChild(skipBtn);
+  status.appendChild(actions);
   card.appendChild(status);
 
   // Reflects bundle state across pill, confirm button, skip button, and the
@@ -251,8 +265,36 @@ function el(tag, className, text) {
   return node;
 }
 
+// Build absolute-positioned overlay <div>s for the highlight bboxes attached
+// to a bundle. Each bbox is in page-percent coords (top-left origin) so the
+// overlays scale with whatever element they're laid over, without us needing
+// to know the rendered pixel size.
+function buildHighlightMarks(highlights) {
+  const marks = [];
+  if (!highlights) return marks;
+  for (const key of ["check", "address"]) {
+    const b = highlights[key];
+    if (!b) continue;
+    // Pad slightly so the marker sits a hair outside the glyph bbox — looks
+    // more like a real highlighter swipe than a tight rectangle.
+    const padX = 0.4;
+    const padY = 0.4;
+    const m = document.createElement("div");
+    m.className = `highlight ${key}`;
+    m.style.left = `${Math.max(0, b.x - padX)}%`;
+    m.style.top = `${Math.max(0, b.y - padY)}%`;
+    m.style.width = `${b.w + padX * 2}%`;
+    m.style.height = `${b.h + padY * 2}%`;
+    marks.push(m);
+  }
+  return marks;
+}
+
 // Lightbox: lazy-attaches its dismiss listeners (backdrop click + Escape) on
 // first open, so we don't pay for them until the user actually zooms a page.
+// Overlays mirror the review-card highlights — the lightbox container holds
+// a wrapper around the <img> so the absolute-positioned marks land on the
+// image rather than the full backdrop.
 let lightboxReady = false;
 function ensureLightbox() {
   if (lightboxReady) return;
@@ -264,19 +306,25 @@ function ensureLightbox() {
   });
   lightboxReady = true;
 }
-function openLightbox(src, alt) {
+function openLightbox(src, alt, highlights) {
   ensureLightbox();
   const lb = $("lightbox");
+  const wrap = $("lightbox-wrap");
   const img = $("lightbox-img");
-  if (!lb || !img) return;
+  if (!lb || !img || !wrap) return;
   img.src = src;
   img.alt = alt || "";
+  // Replace any previous overlays.
+  for (const old of wrap.querySelectorAll(".highlight")) old.remove();
+  for (const mark of buildHighlightMarks(highlights)) wrap.appendChild(mark);
   lb.hidden = false;
 }
 function closeLightbox() {
   const lb = $("lightbox");
+  const wrap = $("lightbox-wrap");
   const img = $("lightbox-img");
   if (!lb) return;
   lb.hidden = true;
   if (img) img.src = "";
+  if (wrap) for (const old of wrap.querySelectorAll(".highlight")) old.remove();
 }

@@ -4,7 +4,7 @@ export const state = {
   pdfBytes: null,   // ArrayBuffer of the source PDF
   pdfDoc: null,     // pdf.js PDFDocumentProxy
   bundles: [],      // [{ index, pages, thumbnail, address, addressDetected, skipped }]
-  prefix: "LPTR-",
+  prefix: "LPTR.",
   threshold: 55,
 };
 
