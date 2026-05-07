@@ -1,7 +1,7 @@
 import { state } from "./state.js";
 import { $, showScreen, toast } from "./ui/dom.js";
 import { initUpload } from "./ui/upload.js";
-import { renderReview, countNeedsReview } from "./ui/review.js";
+import { renderReview, countNeedsReview, countNeedsApproval } from "./ui/review.js";
 import { runPipeline, PipelineError } from "./pipeline/index.js";
 import { buildZip, suggestZipName, triggerDownload } from "./pipeline/zip.js";
 
@@ -35,14 +35,18 @@ $("btn-download").addEventListener("click", async () => {
     toast("Every Bundle Is Skipped — Nothing to Download.", "bad");
     return;
   }
-  const pending = countNeedsReview(live);
+  const pending = countNeedsApproval(live);
   if (pending > 0) {
-    const ok = confirm(
-      pending === 1
-        ? `1 Bundle Is Still Flagged as "Needs Review". Download Anyway?`
-        : `${pending} Bundles Are Still Flagged as "Needs Review". Download Anyway?`
-    );
-    if (!ok) return;
+    const flagged = countNeedsReview(live);
+    const pendingTxt =
+      pending === 1 ? `1 Bundle Has Not Been Approved` : `${pending} Bundles Have Not Been Approved`;
+    const flaggedTxt =
+      flagged === 0
+        ? ""
+        : flagged === 1
+          ? ` (1 Still Needs Review)`
+          : ` (${flagged} Still Need Review)`;
+    if (!confirm(`${pendingTxt}${flaggedTxt}. Download Anyway?`)) return;
   }
   btn.disabled = true;
   const original = btn.textContent;
