@@ -53,5 +53,7 @@ export async function runPipeline(state) {
 
   // Stage 4: front-page processing (text/OCR + address + thumbnails).
   setStage("ocr");
-  state.bundles = await processBundles(state.pdfDoc, groups);
+  state.bundles = await processBundles(state.pdfDoc, groups, {
+    checkLookup: state.checkLookup,
+  });
 }

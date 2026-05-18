@@ -136,6 +136,89 @@ main {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+/* ===== Spreadsheet paste ===== */
+.spreadsheet-paste {
+  margin-top: 18px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 22px;
+}
+.spreadsheet-paste > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.spreadsheet-paste > summary::-webkit-details-marker { display: none; }
+.spreadsheet-paste > summary::before {
+  content: "▸";
+  color: var(--ink-faint);
+  display: inline-block;
+  margin-right: 8px;
+  transition: transform 120ms ease;
+}
+.spreadsheet-paste[open] > summary::before {
+  transform: rotate(90deg);
+}
+.spreadsheet-summary-title {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+}
+.spreadsheet-summary-help {
+  font-size: 13px;
+  color: var(--ink-faint);
+  margin-left: 22px;
+}
+.spreadsheet-body {
+  padding: 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.spreadsheet-body label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+.spreadsheet-body textarea {
+  width: 100%;
+  min-height: 120px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--ink);
+  resize: vertical;
+}
+.spreadsheet-body textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.spreadsheet-status {
+  font-size: 13px;
+  font-family: var(--mono);
+  color: var(--ink-faint);
+  min-height: 1.2em;
+}
+.spreadsheet-status.ok { color: var(--ok); }
+.spreadsheet-status.bad { color: var(--bad); }
+.spreadsheet-body button {
+  align-self: flex-start;
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
 /* ===== Progress ===== */
 .progress-wrap {
   background: var(--bg-elev);
@@ -440,6 +523,21 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
   border-color: var(--accent);
   color: var(--accent);
   font-weight: 600;
+}
+/* Spreadsheet-source badge: a quiet green-tinted chip so reviewers can spot at
+   a glance which bundles got their address from the pasted spreadsheet vs OCR.
+   Fuzzy matches share the chip shape but switch to the amber palette so they
+   read as "verify me" rather than "trusted". */
+.badge.sheet {
+  background: #eef5ee;
+  border-color: var(--ok);
+  color: var(--ok);
+  font-weight: 600;
+}
+.badge.sheet.fuzzy {
+  background: var(--warn-bg);
+  border-color: var(--warn);
+  color: var(--warn);
 }
 
 .thumb {

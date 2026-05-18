@@ -5,9 +5,10 @@ import { renderReview, countNeedsReview, countNeedsApproval } from "./ui/review.
 import { runPipeline, PipelineError } from "./pipeline/index.js";
 import { buildZip, suggestZipName, triggerDownload } from "./pipeline/zip.js";
 
-initUpload(({ file, prefix }) => {
+initUpload(({ file, prefix, checkLookup }) => {
   state.file = file;
   state.prefix = prefix;
+  state.checkLookup = checkLookup || null;
 
   showScreen("progress");
   runPipeline(state)

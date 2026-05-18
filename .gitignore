@@ -11,6 +11,9 @@ __pycache__/
 sample_check_generator/
 tests/
 
+# Sample deposit spreadsheet — internal fixture, not for the public repo.
+*.xlsx
+
 # OS metadata
 .DS_Store
 Thumbs.db

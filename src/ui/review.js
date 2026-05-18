@@ -139,6 +139,19 @@ function buildCard(bundle, prefix, onChange) {
   if (bundle.checkNumber) {
     badges.append(el("span", "badge check", `Check# ${bundle.checkNumber}`));
   }
+  // Source badge: shows when the address came from the pasted spreadsheet
+  // rather than OCR. Fuzzy matches get an extra "~" hint so reviewers know
+  // it's a near-miss rather than an exact hit.
+  if (bundle.addressSource === "spreadsheet") {
+    badges.append(el("span", "badge sheet", "From Spreadsheet"));
+  } else if (bundle.addressSource === "spreadsheet-fuzzy") {
+    const tag = el("span", "badge sheet fuzzy", "Spreadsheet ~Match");
+    const m = bundle.addressLookupMatch;
+    if (m && m.matchedCheck) {
+      tag.title = `Fuzzy-matched spreadsheet row for check# ${m.matchedCheck}`;
+    }
+    badges.append(tag);
+  }
   card.appendChild(badges);
 
   const thumbWrap = el("div", "thumb-wrap");
@@ -251,6 +264,14 @@ function buildCard(bundle, prefix, onChange) {
 
 function pillTextFor(bundle) {
   if (bundle.reviewConfirmed) return "Approved";
+  // Spreadsheet matches override the default OCR-confidence wording so the
+  // reviewer can tell at a glance where the address came from. Fuzzy
+  // spreadsheet matches still sit in the weak/amber tier so they get an
+  // explicit "verify" prompt.
+  if (bundle.addressSource === "spreadsheet") return "Address from Spreadsheet";
+  if (bundle.addressSource === "spreadsheet-fuzzy") {
+    return "Verify — Fuzzy Spreadsheet Match";
+  }
   switch (bundle.addressConfidence) {
     case "strong": return "Address Detected";
     case "weak":   return "Verify — Unfamiliar Suffix";

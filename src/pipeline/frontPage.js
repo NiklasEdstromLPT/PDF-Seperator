@@ -4,6 +4,7 @@ import { setProgress } from "../ui/progress.js";
 import { extractAddress } from "./address.js";
 import { extractCheckNumber, findCandidateInString } from "./checkNumber.js";
 import { buildNameBody } from "./filename.js";
+import { applyCheckLookup } from "./checkLookup.js";
 
 // Thumbnails are kept in memory for the review screen only (session-scoped),
 // so render generously: 1.5x base, bumped to devicePixelRatio on retina/HiDPI
@@ -27,7 +28,14 @@ async function teardownTesseract() {
 // Process each bundle's front page: render thumbnail, extract text + positional
 // digit candidates, pull a candidate address and check number, locate the
 // extracted values back in the page tokens for highlighter overlays.
-export async function processBundles(pdfDoc, groups) {
+//
+// opts.checkLookup (optional): a buildCheckLookup() result. When present and a
+// bundle's auto-detected check# matches a row in the pasted spreadsheet, that
+// row's address replaces the OCR address. Exact matches keep strong
+// confidence; fuzzy matches drop to weak so the bundle still gets flagged
+// for human review.
+export async function processBundles(pdfDoc, groups, opts = {}) {
+  const { checkLookup = null } = opts;
   const bundles = [];
   try {
     for (let i = 0; i < groups.length; i++) {
@@ -38,8 +46,20 @@ export async function processBundles(pdfDoc, groups) {
       const { text, candidates, tokens } = await extractTextAndCandidates(front);
       front.cleanup();
 
-      const { value: address, confidence } = extractAddress(text);
+      const ocrAddress = extractAddress(text);
       const checkNumber = extractCheckNumber(text, candidates);
+
+      // Spreadsheet override. We only attempt the lookup when OCR produced a
+      // usable check#; without one there's nothing to key on. The lookup
+      // either replaces both the address and the confidence, or leaves them
+      // alone.
+      const resolved = applyCheckLookup({
+        checkNumber,
+        ocrAddress,
+        lookup: checkLookup,
+      });
+      const address = resolved.address;
+      const confidence = resolved.confidence;
 
       bundles.push({
         index: i,
@@ -51,6 +71,11 @@ export async function processBundles(pdfDoc, groups) {
         // hadn't been auto-detected.
         addressDetected: confidence === "strong",
         addressConfidence: confidence,
+        // "ocr" | "spreadsheet" | "spreadsheet-fuzzy" — drives the review
+        // pill text so reviewers can see at a glance where an address came
+        // from. Spreadsheet-fuzzy matches always sit in the weak/amber tier.
+        addressSource: resolved.source,
+        addressLookupMatch: resolved.match || null,
         checkNumber,
         nameBody: buildNameBody(checkNumber, address),
         // Bbox percentages (0-100, top-left origin) of where the auto-detected

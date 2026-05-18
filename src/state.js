@@ -6,6 +6,10 @@ export const state = {
   bundles: [],      // [{ index, pages, thumbnail, address, addressDetected, skipped }]
   prefix: "LPTR.",
   threshold: 55,
+  // Optional check#→address table from a pasted-in Excel range.
+  // Built by buildCheckLookup() in pipeline/checkLookup.js; null when the
+  // user didn't paste anything.
+  checkLookup: null,
 };
 
 export function resetState() {
@@ -13,4 +17,5 @@ export function resetState() {
   state.pdfBytes = null;
   state.pdfDoc = null;
   state.bundles = [];
+  state.checkLookup = null;
 }

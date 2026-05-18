@@ -29,6 +29,20 @@
         <div class="help">Prepended to every output file.</div>
       </div>
     </div>
+
+    <details class="spreadsheet-paste" id="spreadsheet-details">
+      <summary>
+        <span class="spreadsheet-summary-title">Optional: paste deposit spreadsheet</span>
+        <span class="spreadsheet-summary-help">Copy the Check #&nbsp;and Property Address columns out of Excel and paste below. We'll auto-fill addresses by check number.</span>
+      </summary>
+      <div class="spreadsheet-body">
+        <label for="spreadsheet-paste">Paste tab-separated rows from Excel</label>
+        <textarea id="spreadsheet-paste" rows="6" spellcheck="false"
+          placeholder="Trans ID&#9;Property Address&#9;Check #&#9;Check Amt&#10;410122&#9;742 Evergreen Terrace&#9;5501234&#9;1195"></textarea>
+        <div class="spreadsheet-status" id="spreadsheet-status" aria-live="polite"></div>
+        <button type="button" class="subtle" id="spreadsheet-clear">Clear</button>
+      </div>
+    </details>
   </section>
 
   <section id="screen-progress" class="screen">
