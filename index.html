@@ -68,6 +68,15 @@
       <div class="review-actions">
         <button id="btn-restart" class="subtle">Start Over</button>
         <button id="btn-download" class="primary">Download All as ZIP</button>
+        <div class="more-wrap">
+          <button id="btn-more" class="subtle more-btn" aria-haspopup="menu" aria-expanded="false" aria-label="More options" title="More options">&#x2026;</button>
+          <div id="more-menu" class="more-menu" hidden role="menu">
+            <button type="button" class="more-item" role="menuitem" id="btn-export-diag">
+              <span class="more-item-title">Export diagnostic report</span>
+              <span class="more-item-sub">Dev tool — analyze why addresses were missed</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
     <div id="pending-approval-count" class="needs-count pending" hidden></div>

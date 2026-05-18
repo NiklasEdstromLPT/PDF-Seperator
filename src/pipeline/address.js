@@ -183,6 +183,144 @@ function scanWithLabels(text, labelRe) {
   return bestWeak || NONE;
 }
 
+// Dev-mode diagnostic. Re-runs the same scan logic as extractAddress() but
+// records every step — label hits, slices, regex outcomes, rejection reasons —
+// so the dev report can show *why* a given page produced (or failed to produce)
+// an address. Pure observation; never mutates state and never affects the
+// production extraction path.
+//
+// Shape:
+//   {
+//     final: { value, confidence },
+//     pass1: { ran, labelHits: [...], result },
+//     pass2: { ran, labelHits: [...], result },
+//     propertyMentions: [{ token, index, context, hasColon }]
+//   }
+//
+// Each labelHit:
+//   {
+//     label: matched label text (e.g. "Property Address: "),
+//     index: position in raw text,
+//     slice: 220-char window after the label (post-trim),
+//     rawSlice: same window before next-label trim,
+//     strict: { matched, value, accepted, rejection } | null,
+//     loose:  { matched, value, accepted, rejection } | null
+//   }
+export function traceAddressScan(text) {
+  const trace = {
+    final: { value: "", confidence: "none" },
+    pass1: { ran: false, labelHits: [], result: null },
+    pass2: { ran: false, labelHits: [], result: null },
+    propertyMentions: collectPropertyMentions(text),
+  };
+  if (!text) return trace;
+
+  trace.pass1.ran = true;
+  trace.pass1.result = traceScan(text, PROPERTY_LABEL_RE_STRICT, trace.pass1.labelHits);
+  if (trace.pass1.result.confidence !== "none") {
+    trace.final = trace.pass1.result;
+    return trace;
+  }
+
+  trace.pass2.ran = true;
+  trace.pass2.result = traceScan(text, PROPERTY_LABEL_RE_LOOSE, trace.pass2.labelHits);
+  trace.final = trace.pass2.result;
+  return trace;
+}
+
+function traceScan(text, labelRe, labelHits) {
+  let bestWeak = null;
+  let returnedStrong = null;
+
+  for (const label of text.matchAll(labelRe)) {
+    const start = label.index + label[0].length;
+    const rawSlice = text.slice(start, start + LABEL_WINDOW);
+    const slice = trimAtNextLabel(rawSlice);
+
+    const hit = {
+      label: label[0],
+      index: label.index,
+      slice,
+      rawSlice,
+      strict: null,
+      loose: null,
+    };
+
+    const strictMatch = slice.match(STRICT_ADDR_RE);
+    if (strictMatch) {
+      const candidate = fixDoubleSuffix(clean(strictMatch[1]));
+      const isPayee = isKnownPayee(candidate);
+      hit.strict = {
+        matched: true,
+        value: candidate,
+        accepted: !isPayee && returnedStrong === null,
+        rejection: isPayee ? "known-payee" : null,
+      };
+      if (!isPayee && returnedStrong === null) {
+        returnedStrong = { value: candidate, confidence: "strong" };
+      }
+    } else {
+      hit.strict = { matched: false, value: "", accepted: false, rejection: null };
+    }
+
+    const looseMatch = slice.match(LOOSE_ADDR_RE);
+    if (looseMatch) {
+      const candidate = clean(looseMatch[1]);
+      const lastWord = candidate.split(/\s+/).pop().toLowerCase();
+      const stopHit = LOOSE_STOP_LIST.has(lastWord);
+      const isPayee = isKnownPayee(candidate);
+      let rejection = null;
+      if (stopHit) rejection = `loose-stop-list (last word: "${lastWord}")`;
+      else if (isPayee) rejection = "known-payee";
+      const accepted = !stopHit && !isPayee && bestWeak === null && returnedStrong === null;
+      hit.loose = { matched: true, value: candidate, accepted, rejection };
+      if (!stopHit && !isPayee && bestWeak === null) {
+        bestWeak = { value: candidate, confidence: "weak" };
+      }
+    } else {
+      hit.loose = { matched: false, value: "", accepted: false, rejection: null };
+    }
+
+    labelHits.push(hit);
+    if (returnedStrong) break;
+  }
+
+  if (returnedStrong) return returnedStrong;
+  return bestWeak || { value: "", confidence: "none" };
+}
+
+// Find every "property" / "address" / "for" token in raw text whether or not
+// it carries a colon. Useful for spotting cases where OCR ate the colon and
+// the strict pass walked right past a real label.
+const RAW_MENTION_RE =
+  /\b(property\s+address|property|address|premises|location|description|memo|for|file\s*no\.?)\b\s*(:)?/ig;
+
+function collectPropertyMentions(text) {
+  if (!text) return [];
+  const out = [];
+  for (const m of text.matchAll(RAW_MENTION_RE)) {
+    const idx = m.index;
+    out.push({
+      token: m[1],
+      hasColon: !!m[2],
+      index: idx,
+      // ±60 chars of context around the label, with the matched span itself
+      // surrounded by «…» so it's easy to spot in the report.
+      context: contextSnippet(text, idx, m[0].length),
+    });
+  }
+  return out;
+}
+
+function contextSnippet(text, idx, len, pad = 60) {
+  const start = Math.max(0, idx - pad);
+  const end = Math.min(text.length, idx + len + pad);
+  const before = text.slice(start, idx);
+  const match = text.slice(idx, idx + len);
+  const after = text.slice(idx + len, end);
+  return `${start > 0 ? "…" : ""}${before}«${match}»${after}${end < text.length ? "…" : ""}`;
+}
+
 function trimAtNextLabel(slice) {
   const idx = slice.search(NEXT_LABEL_RE);
   return idx > 0 ? slice.slice(0, idx) : slice;

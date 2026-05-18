@@ -1,7 +1,7 @@
 import { createWorker } from "tesseract.js";
 import { yieldToUi } from "../ui/dom.js";
 import { setProgress } from "../ui/progress.js";
-import { extractAddress } from "./address.js";
+import { extractAddress, traceAddressScan } from "./address.js";
 import { extractCheckNumber, findCandidateInString } from "./checkNumber.js";
 import { buildNameBody } from "./filename.js";
 import { applyCheckLookup } from "./checkLookup.js";
@@ -43,11 +43,15 @@ export async function processBundles(pdfDoc, groups, opts = {}) {
       const front = await pdfDoc.getPage(pages[0] + 1); // pdf.js is 1-based
 
       const thumbnail = await renderThumbnail(front);
-      const { text, candidates, tokens } = await extractTextAndCandidates(front);
+      const { text, candidates, tokens, textSource } = await extractTextAndCandidates(front);
       front.cleanup();
 
       const ocrAddress = extractAddress(text);
       const checkNumber = extractCheckNumber(text, candidates);
+      // Diagnostic snapshot — captured for every bundle so the dev-mode
+      // "export diagnostic report" can explain why detection landed where it
+      // did. Pure observation; nothing here affects production output.
+      const addressTrace = traceAddressScan(text);
 
       // Spreadsheet override. We only attempt the lookup when OCR produced a
       // usable check#; without one there's nothing to key on. The lookup
@@ -87,6 +91,16 @@ export async function processBundles(pdfDoc, groups, opts = {}) {
           address: locateValueBbox(tokens, address, "tightest"),
         },
         skipped: false,
+        diagnostics: {
+          textSource,
+          rawText: text || "",
+          rawTextLen: (text || "").length,
+          candidatesCount: candidates.length,
+          tokensCount: tokens.length,
+          addressTrace,
+          ocrAddress,
+          resolved,
+        },
       });
 
       setProgress(((i + 1) / groups.length) * 100, `Bundle ${i + 1} of ${groups.length}`);
@@ -138,6 +152,7 @@ async function extractTextAndCandidates(page) {
       text,
       candidates: candidatesFromTextItems(items),
       tokens: tokensFromTextItems(items, pageWidth, pageHeight),
+      textSource: "embedded-text",
     };
   }
 
@@ -155,6 +170,7 @@ async function extractTextAndCandidates(page) {
     text: data.text || "",
     candidates: candidatesFromTesseractWords(data.words || []),
     tokens: tokensFromTesseractWords(data.words || [], canvas.width, canvas.height),
+    textSource: "ocr",
   };
 }
 
