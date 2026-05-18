@@ -548,14 +548,88 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
   border-radius: 6px;
   object-fit: contain;
   display: block;
-  transition: filter 120ms ease;
 }
 
 .thumb-wrap {
   position: relative;
-  cursor: zoom-in;
 }
-.thumb-wrap:hover .thumb { filter: brightness(0.85); }
+
+/* Scrollable viewport. At 1× zoom .thumb-scale is exactly 100% wide so nothing
+   overflows and the scrollbars stay hidden. At higher zoom levels JS sets
+   .thumb-scale's width to >100%, content overflows, scrollbars appear. */
+.thumb-viewport {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 8.5 / 11;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--bg);
+  /* Subtler scrollbars so they don't fight the page styling. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.thumb-viewport::-webkit-scrollbar { width: 8px; height: 8px; }
+.thumb-viewport::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 4px;
+}
+.thumb-viewport::-webkit-scrollbar-track { background: transparent; }
+
+/* The scaled wrapper that grows with zoom. width is set inline by JS; height
+   follows from the .thumb's intrinsic aspect ratio. position:relative anchors
+   the % -positioned .highlight overlays. */
+.thumb-scale {
+  position: relative;
+  width: 100%;
+  line-height: 0;
+}
+.thumb-scale .thumb {
+  border: none;
+  border-radius: 0;
+}
+
+/* Zoom toolbar — tucked onto the right end of the .badges row (index /
+   page-count / check# live on the left). margin-left:auto eats whatever
+   horizontal space remains so the buttons hug the right edge. They sit
+   above the preview in document order so they never overlap text in the
+   page's top-right corner (which is exactly where addresses and check
+   numbers tend to live). */
+.zoom-controls {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.zoom-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  color: var(--ink-soft);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  transition: background 100ms ease, border-color 100ms ease, color 100ms ease,
+              opacity 120ms ease, transform 80ms ease;
+}
+.zoom-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.zoom-btn:active { transform: scale(0.94); }
+.zoom-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: var(--accent);
+}
+.zoom-btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.zoom-btn svg { width: 18px; height: 18px; }
 
 /* Highlighter overlay marks — translucent yellow rectangles positioned with
    page-percent coordinates so they scale with the thumbnail/lightbox. The

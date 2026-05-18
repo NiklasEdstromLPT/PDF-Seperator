@@ -154,26 +154,91 @@ function buildCard(bundle, prefix, onChange) {
   }
   card.appendChild(badges);
 
+  // Thumb structure:
+  //   .thumb-wrap        — wraps the scrollable viewport
+  //     .thumb-viewport  — overflow:auto, scrollbars appear once zoomed in
+  //       .thumb-scale   — width grows with zoom level; img + highlights live here
+  //         img.thumb
+  //         .highlight*
+  //
+  // Zoom controls live in their own row above the preview (not pinned over
+  // it) so they never obscure address/check# text that sits in the page's
+  // top-right corner.
   const thumbWrap = el("div", "thumb-wrap");
+  const thumbViewport = el("div", "thumb-viewport");
+  const thumbScale = el("div", "thumb-scale");
   const img = document.createElement("img");
   img.className = "thumb";
   img.alt = `Front page of bundle ${bundle.index + 1}`;
   img.src = bundle.thumbnail;
-  thumbWrap.appendChild(img);
+  thumbScale.appendChild(img);
   // Highlighter overlay marks on the thumbnail showing where the auto-detected
   // check# and address came from on the page. DOM-only — never reaches the
-  // exported PDF in the ZIP.
+  // exported PDF in the ZIP. Marks live inside .thumb-scale so their
+  // percent-based positioning scales with the image when zoomed.
   for (const mark of buildHighlightMarks(bundle.highlights)) {
-    thumbWrap.appendChild(mark);
+    thumbScale.appendChild(mark);
   }
-  const zoomIcon = el("div", "zoom-icon");
-  zoomIcon.innerHTML =
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
-    '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>';
-  thumbWrap.appendChild(zoomIcon);
-  thumbWrap.addEventListener("click", () =>
-    openLightbox(bundle.thumbnail, img.alt, bundle.highlights),
-  );
+  thumbViewport.appendChild(thumbScale);
+  thumbWrap.appendChild(thumbViewport);
+
+  // HIDDEN — previous "click thumb to open modal lightbox" UI. Kept commented
+  // (not deleted) so we can revert to it if the inline zoom doesn't pan out.
+  // The openLightbox / closeLightbox / ensureLightbox helpers below remain
+  // wired up and ready; only the trigger here is disabled.
+  // const zoomIcon = el("div", "zoom-icon");
+  // zoomIcon.innerHTML =
+  //   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+  //   '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>';
+  // thumbWrap.appendChild(zoomIcon);
+  // thumbWrap.addEventListener("click", () =>
+  //   openLightbox(bundle.thumbnail, img.alt, bundle.highlights),
+  // );
+
+  // Inline per-card zoom: a + / − pair sitting in its own row above the
+  // preview. Each press recenters the viewport on the highlighted region so
+  // the user can read the address / check# without leaving the grid.
+  const zoomControls = el("div", "zoom-controls");
+  const zoomInBtn = makeZoomBtn("in", "Zoom in on preview");
+  const zoomOutBtn = makeZoomBtn("out", "Zoom out on preview");
+  zoomControls.append(zoomOutBtn, zoomInBtn);
+
+  let zoomIdx = 0;
+  const applyZoom = () => {
+    const level = ZOOM_LEVELS[zoomIdx];
+    thumbScale.style.width = `${level * 100}%`;
+    zoomOutBtn.disabled = zoomIdx === 0;
+    zoomInBtn.disabled = zoomIdx === ZOOM_LEVELS.length - 1;
+    // Wait one frame so the new width is reflected in scroll metrics before
+    // we read scrollWidth / scrollHeight to compute the scroll target.
+    requestAnimationFrame(() => {
+      const focus = highlightFocusPoint(bundle.highlights);
+      const sw = thumbViewport.scrollWidth;
+      const sh = thumbViewport.scrollHeight;
+      const vw = thumbViewport.clientWidth;
+      const vh = thumbViewport.clientHeight;
+      thumbViewport.scrollLeft = Math.max(0, (focus.x / 100) * sw - vw / 2);
+      thumbViewport.scrollTop = Math.max(0, (focus.y / 100) * sh - vh / 2);
+    });
+  };
+  zoomInBtn.addEventListener("click", () => {
+    if (zoomIdx < ZOOM_LEVELS.length - 1) {
+      zoomIdx += 1;
+      applyZoom();
+    }
+  });
+  zoomOutBtn.addEventListener("click", () => {
+    if (zoomIdx > 0) {
+      zoomIdx -= 1;
+      applyZoom();
+    }
+  });
+  applyZoom();
+
+  // Tuck the zoom toolbar onto the right end of the badges row so it shares
+  // a line with the index / page-count / check# badges instead of taking up
+  // its own row.
+  badges.appendChild(zoomControls);
   card.appendChild(thumbWrap);
 
   const fn = el("div", "filename");
@@ -284,6 +349,44 @@ function el(tag, className, text) {
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+// Discrete zoom stops for the per-card inline zoom. Stepped rather than
+// continuous because users are reading typed text — they want predictable
+// "one click bigger" not fine-grained slider control.
+const ZOOM_LEVELS = [1, 1.5, 2, 3];
+
+function makeZoomBtn(kind, label) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = `zoom-btn zoom-${kind}`;
+  btn.title = label;
+  btn.setAttribute("aria-label", label);
+  // Magnifier icon with a + or − inside the lens.
+  const inner = kind === "in" ? '<path d="M11 8v6M8 11h6"/>' : '<path d="M8 11h6"/>';
+  btn.innerHTML =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<circle cx="11" cy="11" r="7"/>' + inner + '<path d="M21 21l-4.35-4.35"/></svg>';
+  return btn;
+}
+
+// Where on the page the zoom should center. Prefer the midpoint of the
+// check# and address highlights together (keeps both in view when possible);
+// fall back to whichever highlight exists; finally the page center if there
+// are no highlights at all (e.g. ADDRESS REQUIRED cards).
+function highlightFocusPoint(highlights) {
+  if (!highlights) return { x: 50, y: 50 };
+  const center = (b) => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
+  const a = highlights.address;
+  const c = highlights.check;
+  if (a && c) {
+    const ca = center(a);
+    const cc = center(c);
+    return { x: (ca.x + cc.x) / 2, y: (ca.y + cc.y) / 2 };
+  }
+  if (a) return center(a);
+  if (c) return center(c);
+  return { x: 50, y: 50 };
 }
 
 // Build absolute-positioned overlay <div>s for the highlight bboxes attached
