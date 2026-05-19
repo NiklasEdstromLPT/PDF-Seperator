@@ -52,6 +52,16 @@ header.app .sub {
   color: var(--ink-faint);
   font-family: var(--mono);
 }
+header.app .sub-link {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+header.app .sub-link:hover,
+header.app .sub-link:focus-visible {
+  color: var(--accent);
+  outline: none;
+}
 
 main {
   max-width: 1200px;
