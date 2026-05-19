@@ -652,6 +652,64 @@ button.subtle:hover { background: var(--accent-soft); color: var(--ink); }
   border-radius: 0;
 }
 
+/* Split view — revealed at the top of the zoom ladder when both highlights
+   exist. Same outer footprint as .thumb-viewport (page aspect ratio); two
+   stacked panes share the height. Each pane is its own scrollable viewport
+   with its own scaled image, focused on a single highlight. JS toggles
+   display between this and .thumb-viewport — they never appear together. */
+.thumb-split {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  aspect-ratio: 8.5 / 11;
+}
+.thumb-split-pane {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.thumb-split-label {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 1;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.thumb-split-viewport {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--bg);
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.thumb-split-viewport::-webkit-scrollbar { width: 8px; height: 8px; }
+.thumb-split-viewport::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 4px;
+}
+.thumb-split-viewport::-webkit-scrollbar-track { background: transparent; }
+.thumb-split-scale {
+  position: relative;
+  width: 100%;
+  line-height: 0;
+}
+.thumb-split-scale .thumb {
+  border: none;
+  border-radius: 0;
+}
+
 /* Zoom toolbar — tucked onto the right end of the .badges row (index /
    page-count / check# live on the left). margin-left:auto eats whatever
    horizontal space remains so the buttons hug the right edge. They sit

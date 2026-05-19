@@ -182,6 +182,13 @@ function buildCard(bundle, prefix, onChange) {
   thumbViewport.appendChild(thumbScale);
   thumbWrap.appendChild(thumbViewport);
 
+  // Split-view sibling: at the top of the zoom ladder we hide the single
+  // viewport and reveal two stacked panes, one per highlight, each scaled
+  // much harder than the single view could be. Lazy: createSplitView
+  // returns null when there's only one (or zero) highlights to split.
+  const splitView = createSplitView(bundle.thumbnail, bundle.highlights, img.alt);
+  if (splitView) thumbWrap.appendChild(splitView.root);
+
   // HIDDEN — previous "click thumb to open modal lightbox" UI. Kept commented
   // (not deleted) so we can revert to it if the inline zoom doesn't pan out.
   // The openLightbox / closeLightbox / ensureLightbox helpers below remain
@@ -203,12 +210,26 @@ function buildCard(bundle, prefix, onChange) {
   const zoomOutBtn = makeZoomBtn("out", "Zoom out on preview");
   zoomControls.append(zoomOutBtn, zoomInBtn);
 
+  // Per-card zoom stops. Middle stops are numeric (single-viewport zoom
+  // levels). The very top stop is the SPLIT_STOP sentinel — when both
+  // highlights exist we append it so the final click swaps to side-by-side
+  // panes (one per highlight) at a much harder per-pane zoom. The numeric
+  // stop just below SPLIT_STOP is the "fit both highlights" level computed
+  // by fittingZoom so the lead-in still keeps both visible.
+  const zoomLevels = zoomLevelsFor(bundle.highlights, !!splitView);
   let zoomIdx = 0;
   const applyZoom = () => {
-    const level = ZOOM_LEVELS[zoomIdx];
-    thumbScale.style.width = `${level * 100}%`;
+    const stop = zoomLevels[zoomIdx];
+    const splitting = stop === SPLIT_STOP;
+    thumbViewport.style.display = splitting ? "none" : "";
+    if (splitView) splitView.root.style.display = splitting ? "flex" : "none";
     zoomOutBtn.disabled = zoomIdx === 0;
-    zoomInBtn.disabled = zoomIdx === ZOOM_LEVELS.length - 1;
+    zoomInBtn.disabled = zoomIdx === zoomLevels.length - 1;
+    if (splitting) {
+      splitView.apply();
+      return;
+    }
+    thumbScale.style.width = `${stop * 100}%`;
     // Wait one frame so the new width is reflected in scroll metrics before
     // we read scrollWidth / scrollHeight to compute the scroll target.
     requestAnimationFrame(() => {
@@ -222,7 +243,7 @@ function buildCard(bundle, prefix, onChange) {
     });
   };
   zoomInBtn.addEventListener("click", () => {
-    if (zoomIdx < ZOOM_LEVELS.length - 1) {
+    if (zoomIdx < zoomLevels.length - 1) {
       zoomIdx += 1;
       applyZoom();
     }
@@ -354,7 +375,110 @@ function el(tag, className, text) {
 // Discrete zoom stops for the per-card inline zoom. Stepped rather than
 // continuous because users are reading typed text — they want predictable
 // "one click bigger" not fine-grained slider control.
-const ZOOM_LEVELS = [1, 1.5, 2, 3];
+const BASE_ZOOM_LEVELS = [1, 1.5, 2, 3];
+
+// Sentinel used as the top of the zoom ladder when both highlights exist.
+// At this stop applyZoom swaps the single viewport out for a split view
+// with one pane per highlight, each at its own much-higher zoom level.
+const SPLIT_STOP = Symbol("split");
+
+// Pick the zoom stops for a card. The numeric stops grow with the default
+// ladder, capped at the "both highlights still visible" fit level. When
+// both highlights are present we also append the SPLIT_STOP sentinel as
+// the final step, so the user can keep clicking + past the fit-both view
+// and drop into a per-highlight split.
+function zoomLevelsFor(highlights, splittable) {
+  const fit = fittingZoom(highlights);
+  const base = fit == null
+    ? BASE_ZOOM_LEVELS.slice()
+    : (() => {
+        // Clamp: never zoom out (< 1×), never zoom past 3× even if the bbox
+        // is tiny — at that point the page text is plenty readable already.
+        const top = Math.max(1, Math.min(3, fit));
+        // Drop intermediate stops that crowd against the new top stop so
+        // the ladder doesn't end with a near-duplicate step (e.g. 2 → 2.1).
+        const stops = BASE_ZOOM_LEVELS.slice(0, -1).filter((v) => v < top - 0.2);
+        stops.push(top);
+        return stops;
+      })();
+  if (splittable) base.push(SPLIT_STOP);
+  return base;
+}
+
+// Largest zoom level at which both highlights stay inside the viewport.
+// Derivation: at zoom L the scaled page is L× the viewport, so the viewport
+// sees 100/L percent of the page in each dimension. For a bbox spanning
+// bboxW% of the page to fit, L ≤ 100 / bboxW. We pad the bbox so the
+// highlights sit a hair inside the corners rather than flush against them.
+function fittingZoom(highlights) {
+  const a = highlights?.address;
+  const c = highlights?.check;
+  if (!a || !c) return null;
+  const x1 = Math.min(a.x, c.x);
+  const y1 = Math.min(a.y, c.y);
+  const x2 = Math.max(a.x + a.w, c.x + c.w);
+  const y2 = Math.max(a.y + a.h, c.y + c.h);
+  const bboxW = x2 - x1;
+  const bboxH = y2 - y1;
+  if (bboxW <= 0 || bboxH <= 0) return null;
+  const pad = 1.08;
+  return Math.min(100 / (bboxW * pad), 100 / (bboxH * pad));
+}
+
+// Build the split-view sibling DOM: two stacked panes inside a container
+// that occupies the same footprint as the single .thumb-viewport. Each
+// pane owns its own scaled image and a single highlight overlay marker,
+// scrolled so the highlight sits in the center of the pane. Returns null
+// when there aren't two distinct highlights to split.
+function createSplitView(src, highlights, alt) {
+  if (!highlights?.check || !highlights?.address) return null;
+  const root = el("div", "thumb-split");
+  const panes = [
+    { key: "check", label: "Check #", bbox: highlights.check },
+    { key: "address", label: "Address", bbox: highlights.address },
+  ];
+  const applies = [];
+  for (const p of panes) {
+    const pane = el("div", "thumb-split-pane");
+    const label = el("div", "thumb-split-label", p.label);
+    const viewport = el("div", "thumb-split-viewport");
+    const scale = el("div", "thumb-split-scale");
+    const im = document.createElement("img");
+    im.className = "thumb";
+    im.src = src;
+    im.alt = `${alt} — ${p.label}`;
+    scale.appendChild(im);
+    for (const m of buildHighlightMarks({ [p.key]: p.bbox })) {
+      scale.appendChild(m);
+    }
+    viewport.appendChild(scale);
+    pane.append(label, viewport);
+    root.appendChild(pane);
+    applies.push(() => applyPaneZoom(viewport, scale, p.bbox));
+  }
+  return { root, apply: () => applies.forEach((fn) => fn()) };
+}
+
+// Choose a per-pane zoom such that the highlight fills ~30% of the pane's
+// width — enough surrounding context to read multi-line addresses without
+// shrinking the actual ink. Clamped to [3×, 8×]: below 3× the split feels
+// pointless next to the single fit-both view; above 8× pixelation kills
+// legibility on low-DPI scans.
+function applyPaneZoom(viewport, scale, bbox) {
+  const targetFrac = 0.3;
+  const L = Math.max(3, Math.min(8, (100 * targetFrac) / Math.max(bbox.w, 0.1)));
+  scale.style.width = `${L * 100}%`;
+  requestAnimationFrame(() => {
+    const fx = bbox.x + bbox.w / 2;
+    const fy = bbox.y + bbox.h / 2;
+    const sw = viewport.scrollWidth;
+    const sh = viewport.scrollHeight;
+    const vw = viewport.clientWidth;
+    const vh = viewport.clientHeight;
+    viewport.scrollLeft = Math.max(0, (fx / 100) * sw - vw / 2);
+    viewport.scrollTop = Math.max(0, (fy / 100) * sh - vh / 2);
+  });
+}
 
 function makeZoomBtn(kind, label) {
   const btn = document.createElement("button");
