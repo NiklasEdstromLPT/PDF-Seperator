@@ -210,12 +210,10 @@ function buildCard(bundle, prefix, onChange) {
   const zoomOutBtn = makeZoomBtn("out", "Zoom out on preview");
   zoomControls.append(zoomOutBtn, zoomInBtn);
 
-  // Per-card zoom stops. Middle stops are numeric (single-viewport zoom
-  // levels). The very top stop is the SPLIT_STOP sentinel — when both
-  // highlights exist we append it so the final click swaps to side-by-side
-  // panes (one per highlight) at a much harder per-pane zoom. The numeric
-  // stop just below SPLIT_STOP is the "fit both highlights" level computed
-  // by fittingZoom so the lead-in still keeps both visible.
+  // Per-card zoom stops. Cards with both highlights collapse to [1×, SPLIT]
+  // so one + click goes straight to the split view; cards with only one
+  // highlight keep the [1, 1.5, 2, 3] ladder since split isn't available.
+  // Always starts at 1× (idx 0).
   const zoomLevels = zoomLevelsFor(bundle.highlights, !!splitView);
   let zoomIdx = 0;
   const applyZoom = () => {
@@ -382,47 +380,15 @@ const BASE_ZOOM_LEVELS = [1, 1.5, 2, 3];
 // with one pane per highlight, each at its own much-higher zoom level.
 const SPLIT_STOP = Symbol("split");
 
-// Pick the zoom stops for a card. The numeric stops grow with the default
-// ladder, capped at the "both highlights still visible" fit level. When
-// both highlights are present we also append the SPLIT_STOP sentinel as
-// the final step, so the user can keep clicking + past the fit-both view
-// and drop into a per-highlight split.
-function zoomLevelsFor(highlights, splittable) {
-  const fit = fittingZoom(highlights);
-  const base = fit == null
-    ? BASE_ZOOM_LEVELS.slice()
-    : (() => {
-        // Clamp: never zoom out (< 1×), never zoom past 3× even if the bbox
-        // is tiny — at that point the page text is plenty readable already.
-        const top = Math.max(1, Math.min(3, fit));
-        // Drop intermediate stops that crowd against the new top stop so
-        // the ladder doesn't end with a near-duplicate step (e.g. 2 → 2.1).
-        const stops = BASE_ZOOM_LEVELS.slice(0, -1).filter((v) => v < top - 0.2);
-        stops.push(top);
-        return stops;
-      })();
-  if (splittable) base.push(SPLIT_STOP);
-  return base;
-}
-
-// Largest zoom level at which both highlights stay inside the viewport.
-// Derivation: at zoom L the scaled page is L× the viewport, so the viewport
-// sees 100/L percent of the page in each dimension. For a bbox spanning
-// bboxW% of the page to fit, L ≤ 100 / bboxW. We pad the bbox so the
-// highlights sit a hair inside the corners rather than flush against them.
-function fittingZoom(highlights) {
-  const a = highlights?.address;
-  const c = highlights?.check;
-  if (!a || !c) return null;
-  const x1 = Math.min(a.x, c.x);
-  const y1 = Math.min(a.y, c.y);
-  const x2 = Math.max(a.x + a.w, c.x + c.w);
-  const y2 = Math.max(a.y + a.h, c.y + c.h);
-  const bboxW = x2 - x1;
-  const bboxH = y2 - y1;
-  if (bboxW <= 0 || bboxH <= 0) return null;
-  const pad = 1.08;
-  return Math.min(100 / (bboxW * pad), 100 / (bboxH * pad));
+// Per-card zoom ladder. Always starts at 1× (fully zoomed out). When both
+// highlights are present the ladder collapses to [1×, SPLIT] — the
+// intermediate single-view stops are skipped so a single + click jumps
+// straight into the per-highlight split view, which is what the reviewer
+// actually wants for those cards. Cards with only one (or zero) highlights
+// keep the full [1, 1.5, 2, 3] ladder since there's no split to skip to.
+function zoomLevelsFor(_highlights, splittable) {
+  if (splittable) return [1, SPLIT_STOP];
+  return BASE_ZOOM_LEVELS.slice();
 }
 
 // Build the split-view sibling DOM: two stacked panes inside a container
