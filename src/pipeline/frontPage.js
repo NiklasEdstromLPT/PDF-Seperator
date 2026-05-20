@@ -13,16 +13,52 @@ const THUMB_SCALE = Math.max(1.5, (typeof window !== "undefined" && window.devic
 const OCR_SCALE = 2;
 const TEXT_MIN_CHARS = 30;
 
-// Lazily created Tesseract worker; reused across all bundles, terminated at end.
-let tesseractWorker = null;
-async function getTesseract() {
-  if (!tesseractWorker) tesseractWorker = await createWorker("eng");
-  return tesseractWorker;
+// Two Tesseract workers, lazily created and reused across all bundles, both
+// terminated at end:
+//
+//   recogWorker — default OEM (LSTM_ONLY). Used only for worker.recognize().
+//                 tesseract.js auto-picks the smaller "4.0.0_best_int" data
+//                 (LSTM-only) for this worker, giving the best OCR accuracy
+//                 for digit-heavy content like check numbers.
+//
+//   detectWorker — OEM=TESSERACT_ONLY (0) with both "eng" and "osd" loaded.
+//                  Used only for worker.detect() to identify 90/180/270°
+//                  page rotation. DetectOS lives in the legacy Tesseract
+//                  engine, so the LSTM-only default can't run it.
+//
+// Splitting the workers avoids the eng.traineddata cache mismatch that
+// happens when one worker tries to mix LSTM-only and full data, and keeps
+// recognize() on LSTM where digit accuracy is meaningfully better.
+let recogWorker = null;
+let detectWorker = null;
+
+async function getRecogTesseract() {
+  if (!recogWorker) {
+    recogWorker = await createWorker("eng");
+    // 300 dpi is what our render emits (OCR_SCALE=2 of a 150 dpi page).
+    // Without this tesseract assumes 0 dpi and warns; the value also nudges
+    // its line-spacing heuristics.
+    await recogWorker.setParameters({ user_defined_dpi: "300" });
+  }
+  return recogWorker;
 }
+
+async function getDetectTesseract() {
+  if (!detectWorker) {
+    detectWorker = await createWorker(["eng", "osd"], 0);
+    await detectWorker.setParameters({ user_defined_dpi: "300" });
+  }
+  return detectWorker;
+}
+
 async function teardownTesseract() {
-  if (!tesseractWorker) return;
-  try { await tesseractWorker.terminate(); } catch (_) {}
-  tesseractWorker = null;
+  const workers = [recogWorker, detectWorker];
+  recogWorker = null;
+  detectWorker = null;
+  for (const w of workers) {
+    if (!w) continue;
+    try { await w.terminate(); } catch (_) {}
+  }
 }
 
 // Process each bundle's front page: render thumbnail, extract text + positional
@@ -42,8 +78,19 @@ export async function processBundles(pdfDoc, groups, opts = {}) {
       const pages = groups[i];
       const front = await pdfDoc.getPage(pages[0] + 1); // pdf.js is 1-based
 
-      const thumbnail = await renderThumbnail(front);
-      const { text, candidates, tokens, textSource } = await extractTextAndCandidates(front);
+      // OCR first so we know the detected page rotation, then render the
+      // thumbnail upright. pdf.js applies rotation as a clockwise viewport
+      // transform — matching the convention tesseract reports.
+      const {
+        text,
+        candidates,
+        tokens,
+        textSource,
+        rotation,
+        orientationConfidence,
+        ocrMeanConfidence,
+      } = await extractTextAndCandidates(front);
+      const thumbnail = await renderThumbnail(front, rotation);
       front.cleanup();
 
       const ocrAddress = extractAddress(text);
@@ -100,6 +147,9 @@ export async function processBundles(pdfDoc, groups, opts = {}) {
           addressTrace,
           ocrAddress,
           resolved,
+          rotation,
+          orientationConfidence,
+          ocrMeanConfidence,
         },
       });
 
@@ -112,8 +162,10 @@ export async function processBundles(pdfDoc, groups, opts = {}) {
   return bundles;
 }
 
-async function renderThumbnail(page) {
-  const vp = page.getViewport({ scale: THUMB_SCALE });
+async function renderThumbnail(page, rotation = 0) {
+  // pdf.js viewport rotation is in degrees, clockwise; pages stored sideways
+  // get rendered upright when we pass the OCR-detected rotation through here.
+  const vp = page.getViewport({ scale: THUMB_SCALE, rotation });
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.floor(vp.width));
   canvas.height = Math.max(1, Math.floor(vp.height));
@@ -153,6 +205,9 @@ async function extractTextAndCandidates(page) {
       candidates: candidatesFromTextItems(items),
       tokens: tokensFromTextItems(items, pageWidth, pageHeight),
       textSource: "embedded-text",
+      rotation: 0,
+      orientationConfidence: null,
+      ocrMeanConfidence: null,
     };
   }
 
@@ -164,14 +219,66 @@ async function extractTextAndCandidates(page) {
   canvas.height = Math.max(1, Math.floor(vp.height));
   await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
 
-  const worker = await getTesseract();
-  const { data } = await worker.recognize(canvas);
+  // Two-step: detect() runs OSD only (fast — no recognition) to identify
+  // 90/180/270° page rotation. Then we manually rotate the canvas and run
+  // the actual recognize() on the upright image so word bboxes come back in
+  // a coordinate frame that matches the thumbnail.
+  let rotation = 0;
+  let orientationConfidence = null;
+  try {
+    const detect = await getDetectTesseract();
+    const det = await detect.detect(canvas);
+    const od = det && det.data ? det.data.orientation_degrees : null;
+    const oc = det && det.data ? det.data.orientation_confidence : null;
+    orientationConfidence = typeof oc === "number" ? oc : null;
+    if (od != null && (orientationConfidence == null || orientationConfidence >= 1)) {
+      rotation = normalizeRotation(od);
+    }
+  } catch (_) {
+    // OSD fails on pages with too little text to analyze. Fall through with
+    // rotation=0; recognize() does its best on the un-rotated image.
+  }
+
+  let workingCanvas = canvas;
+  if (rotation !== 0) {
+    workingCanvas = rotateCanvas(canvas, rotation);
+  }
+
+  const recog = await getRecogTesseract();
+  const { data } = await recog.recognize(workingCanvas);
+
   return {
     text: data.text || "",
     candidates: candidatesFromTesseractWords(data.words || []),
-    tokens: tokensFromTesseractWords(data.words || [], canvas.width, canvas.height),
+    tokens: tokensFromTesseractWords(data.words || [], workingCanvas.width, workingCanvas.height),
     textSource: "ocr",
+    rotation,
+    orientationConfidence,
+    ocrMeanConfidence: typeof data.confidence === "number" ? data.confidence : null,
   };
+}
+
+// Draw `src` into a new canvas rotated clockwise by `rotation` degrees so
+// previously-sideways/upside-down text ends up upright. For 90 and 270 the
+// new canvas swaps width and height.
+function rotateCanvas(src, rotation) {
+  const out = document.createElement("canvas");
+  const swap = rotation === 90 || rotation === 270;
+  out.width = swap ? src.height : src.width;
+  out.height = swap ? src.width : src.height;
+  const ctx = out.getContext("2d");
+  ctx.translate(out.width / 2, out.height / 2);
+  ctx.rotate((rotation * Math.PI) / 180);
+  ctx.drawImage(src, -src.width / 2, -src.height / 2);
+  return out;
+}
+
+// Snap an arbitrary angle to {0, 90, 180, 270}, folding negatives into the
+// positive equivalent so the result is always a clockwise rotation suitable
+// for pdf.js's getViewport({ rotation }).
+function normalizeRotation(deg) {
+  const n = ((Math.round((Number(deg) || 0) / 90) * 90) % 360 + 360) % 360;
+  return n;
 }
 
 function pageDims(page) {

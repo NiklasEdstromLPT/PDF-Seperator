@@ -154,6 +154,7 @@ function renderBundle(b, prefix) {
           <tr><th>Text source</th><td>${escapeHtml(d.textSource || "unknown")}</td></tr>
           <tr><th>Raw text length</th><td>${d.rawTextLen ?? 0} chars</td></tr>
           <tr><th>Check candidates</th><td>${d.candidatesCount ?? 0}</td></tr>
+          ${d.textSource === "ocr" ? `<tr><th>OCR</th><td>PSM1, rotation ${d.rotation ?? 0}°${d.orientationConfidence != null ? `, orient-conf ${formatNum(d.orientationConfidence)}` : ""}${d.ocrMeanConfidence != null ? `, mean-conf ${formatNum(d.ocrMeanConfidence)}` : ""}</td></tr>` : ""}
           ${b.addressLookupMatch ? `<tr><th>Spreadsheet match</th><td>check# <code>${escapeHtml(b.addressLookupMatch.matchedCheck || "")}</code> (${escapeHtml(b.addressLookupMatch.kind || "")}, distance ${b.addressLookupMatch.distance ?? "?"})</td></tr>` : ""}
         </table>
 
@@ -286,6 +287,12 @@ function escapeHtml(s) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function formatNum(n) {
+  const v = Number(n);
+  if (!isFinite(v)) return "?";
+  return Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(1);
 }
 
 const REPORT_CSS = `

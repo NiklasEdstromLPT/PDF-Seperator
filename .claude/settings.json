@@ -19,7 +19,15 @@
       "Bash(git restore *)",
       "Bash(git check-ignore *)",
       "Bash(python generate_fake_packets.py 20 ./fake_packets --bundle)",
-      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\NiklasEdstrom\\\\Documents\\\\GitHub\\\\PDF-Seperator\" -Recurse -File -Name)"
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\NiklasEdstrom\\\\Documents\\\\GitHub\\\\PDF-Seperator\" -Recurse -File -Name)",
+      "Bash(python -c \"import generate_fake_packets; print\\('ok'\\)\")",
+      "Bash(python generate_fake_packets.py 4 ./_rot_smoke --rotated-pct 100 --random-mode)",
+      "Bash(python generate_fake_packets.py 3 ./_norm_smoke --random-mode)",
+      "Bash(node --check src/pipeline/frontPage.js src/ui/diagnostics.js)",
+      "Bash(node --check src/pipeline/frontPage.js)",
+      "Bash(node --check src/ui/diagnostics.js)",
+      "Bash(python generate_fake_packets.py 8 ./rotated_uat --bundle --rotated-pct 50 --random-mode)",
+      "Bash(node --check src/pipeline/checkNumber.js)"
     ]
   }
 }
