@@ -10,6 +10,13 @@ export const state = {
   // Built by buildCheckLookup() in pipeline/checkLookup.js; null when the
   // user didn't paste anything.
   checkLookup: null,
+  // Optional user-supplied count for sanity-checking the split. null when the
+  // user left the field blank; otherwise a positive integer.
+  expectedBundles: null,
+  // True once the user has dismissed the mismatch banner. Suppresses the
+  // mismatch line in the download-confirm dialog too, on the theory that
+  // dismissing == acknowledgment.
+  mismatchDismissed: false,
 };
 
 export function resetState() {
@@ -18,4 +25,6 @@ export function resetState() {
   state.pdfDoc = null;
   state.bundles = [];
   state.checkLookup = null;
+  state.expectedBundles = null;
+  state.mismatchDismissed = false;
 }
