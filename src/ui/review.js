@@ -56,6 +56,57 @@ export function renderReview(state, onChange = () => {}) {
 
   reorder();
   updateCounter();
+  updateMismatchBanner(state);
+}
+
+// Surface a top-of-screen disclaimer when the user told us how many bundles
+// to expect and the detected count doesn't match. Read-only — independent of
+// the per-card review/approval flow, so it lives outside updateNeedsCount.
+// The banner stays sticky once shown; the dismiss button hides it for the
+// rest of the review session. The expected/actual fact is still consulted
+// by the download-confirm dialog, so dismissing doesn't bypass the warning
+// at export time — the user just gets the banner out of their way after
+// they've reviewed everything.
+export function bundleCountMismatch(state) {
+  const expected = state.expectedBundles;
+  const actual = state.bundles.length;
+  if (!Number.isFinite(expected) || expected <= 0 || expected === actual) {
+    return null;
+  }
+  return { expected, actual };
+}
+
+function updateMismatchBanner(state) {
+  const host = $("review-mismatch-count");
+  if (!host) return;
+  host.innerHTML = "";
+  const m = bundleCountMismatch(state);
+  if (!m) {
+    host.hidden = true;
+    return;
+  }
+  const verb = m.actual < m.expected ? "Only" : "But";
+  const noun = m.actual === 1 ? "Bundle" : "Bundles";
+
+  const text = document.createElement("span");
+  text.className = "needs-count-text";
+  text.textContent =
+    `You Expected ${m.expected} Bundles, ${verb} ${m.actual} ${noun} Were Detected. ` +
+    `Please Review, or Try Uploading/Scanning Again.`;
+
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "needs-count-close";
+  close.setAttribute("aria-label", "Dismiss");
+  close.title = "Dismiss";
+  close.textContent = "×";
+  close.addEventListener("click", () => {
+    state.mismatchDismissed = true;
+    host.hidden = true;
+  });
+
+  host.append(text, close);
+  host.hidden = false;
 }
 
 // Sort priority for the review grid:
@@ -114,7 +165,7 @@ function updateNeedsCount(bundles) {
   if (pendingEl) {
     pendingEl.hidden = pending === 0;
     pendingEl.textContent =
-      pending === 1 ? "1 Bundle Pending Approval" : `${pending} Bundles Pending Approval`;
+      pending === 1 ? "1 Bundle Is Pending Approval" : `${pending} Bundles Are Pending Approval`;
   }
 
   if (reviewEl) {
@@ -206,8 +257,8 @@ function buildCard(bundle, prefix, onChange) {
   // preview. Each press recenters the viewport on the highlighted region so
   // the user can read the address / check# without leaving the grid.
   const zoomControls = el("div", "zoom-controls");
-  const zoomInBtn = makeZoomBtn("in", "Zoom in on preview");
-  const zoomOutBtn = makeZoomBtn("out", "Zoom out on preview");
+  const zoomInBtn = makeZoomBtn("in", "Zoom In on Preview");
+  const zoomOutBtn = makeZoomBtn("out", "Zoom Out on Preview");
   zoomControls.append(zoomOutBtn, zoomInBtn);
 
   // Per-card zoom stops. Cards with both highlights collapse to [1×, SPLIT]
@@ -352,7 +403,7 @@ function pillTextFor(bundle) {
   // reviewer can tell at a glance where the address came from. Fuzzy
   // spreadsheet matches still sit in the weak/amber tier so they get an
   // explicit "verify" prompt.
-  if (bundle.addressSource === "spreadsheet") return "Address from Spreadsheet";
+  if (bundle.addressSource === "spreadsheet") return "Address From Spreadsheet";
   if (bundle.addressSource === "spreadsheet-fuzzy") {
     return "Verify — Fuzzy Spreadsheet Match";
   }

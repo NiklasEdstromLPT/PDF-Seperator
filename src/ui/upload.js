@@ -37,13 +37,13 @@ export function initUpload(onFile) {
     if (rows.length === 0) {
       statusEl.className = "spreadsheet-status bad";
       statusEl.textContent =
-        (warnings[0] || "Couldn't parse the pasted data.");
+        (warnings[0] || "Couldn't Parse the Pasted Data.");
       return;
     }
-    const word = rows.length === 1 ? "row" : "rows";
+    const word = rows.length === 1 ? "Row" : "Rows";
     const tail = warnings.length ? ` · ${warnings.join(" ")}` : "";
     statusEl.className = "spreadsheet-status ok";
-    statusEl.textContent = `Loaded ${rows.length} ${word} from spreadsheet.${tail}`;
+    statusEl.textContent = `Loaded ${rows.length} ${word} From Spreadsheet.${tail}`;
   }
 
   if (pasteEl) {
@@ -87,15 +87,19 @@ export function initUpload(onFile) {
 
   function accept(file) {
     if (file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)) {
-      toast("That doesn't look like a PDF. Please pick a .pdf file.", "bad");
+      toast("That Doesn't Look Like a PDF. Please Pick a .pdf File.", "bad");
       return;
     }
     const prefix = $("prefix").value || "";
+    const expectedRaw = $("expected-bundles") ? $("expected-bundles").value.trim() : "";
+    const expectedNum = expectedRaw === "" ? null : Number.parseInt(expectedRaw, 10);
+    const expectedBundles =
+      Number.isFinite(expectedNum) && expectedNum > 0 ? expectedNum : null;
     // Auto-open the disclosure if the user has typed something but never
     // expanded it — defensive against a stray Tab-into-the-textarea workflow.
     if (detailsEl && pasteEl && pasteEl.value.trim() && !detailsEl.open) {
       detailsEl.open = true;
     }
-    onFile({ file, prefix, checkLookup: currentLookup });
+    onFile({ file, prefix, checkLookup: currentLookup, expectedBundles });
   }
 }

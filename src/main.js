@@ -1,15 +1,16 @@
 import { state } from "./state.js";
 import { $, showScreen, toast } from "./ui/dom.js";
 import { initUpload } from "./ui/upload.js";
-import { renderReview, countNeedsReview, countNeedsApproval } from "./ui/review.js";
+import { renderReview, countNeedsReview, countNeedsApproval, bundleCountMismatch } from "./ui/review.js";
 import { runPipeline, PipelineError } from "./pipeline/index.js";
 import { buildZip, suggestZipName, triggerDownload } from "./pipeline/zip.js";
 import { downloadDiagnosticReport } from "./ui/diagnostics.js";
 
-initUpload(({ file, prefix, checkLookup }) => {
+initUpload(({ file, prefix, checkLookup, expectedBundles }) => {
   state.file = file;
   state.prefix = prefix;
   state.checkLookup = checkLookup || null;
+  state.expectedBundles = expectedBundles ?? null;
 
   showScreen("progress");
   runPipeline(state)
@@ -81,18 +82,37 @@ $("btn-download").addEventListener("click", async () => {
     toast("Every Bundle Is Skipped — Nothing to Download.", "bad");
     return;
   }
+  // Collect every active disclaimer into one confirm dialog so the user sees
+  // the full picture before deciding to download. Mirrors the on-screen
+  // banners (mismatch → pending → critical review) so wording stays
+  // consistent across the two surfaces.
+  const warnings = [];
+  // Suppress the mismatch line when the user has dismissed the banner —
+  // dismissing == "yes, I've seen it, move on". The other warnings
+  // (pending / critical review) stay in scope because those track per-card
+  // approval, not a one-time acknowledgment.
+  const mismatch = state.mismatchDismissed ? null : bundleCountMismatch(state);
+  if (mismatch) {
+    const verb = mismatch.actual < mismatch.expected ? "Only" : "But";
+    const noun = mismatch.actual === 1 ? "Bundle" : "Bundles";
+    warnings.push(
+      `You Expected ${mismatch.expected} Bundles, ${verb} ${mismatch.actual} ${noun} Were Detected.`,
+    );
+  }
   const pending = countNeedsApproval(live);
   if (pending > 0) {
-    const flagged = countNeedsReview(live);
-    const pendingTxt =
-      pending === 1 ? `1 Bundle Has Not Been Approved` : `${pending} Bundles Have Not Been Approved`;
-    const flaggedTxt =
-      flagged === 0
-        ? ""
-        : flagged === 1
-          ? ` (1 Still Needs Review)`
-          : ` (${flagged} Still Need Review)`;
-    if (!confirm(`${pendingTxt}${flaggedTxt}. Download Anyway?`)) return;
+    warnings.push(
+      pending === 1 ? "1 Bundle Is Pending Approval" : `${pending} Bundles Are Pending Approval`,
+    );
+  }
+  const flagged = countNeedsReview(live);
+  if (flagged > 0) {
+    warnings.push(
+      flagged === 1 ? "1 Bundle Needs Critical Review" : `${flagged} Bundles Need Critical Review`,
+    );
+  }
+  if (warnings.length > 0) {
+    if (!confirm(`${warnings.join("\n")}\n\nDownload Anyway?`)) return;
   }
   btn.disabled = true;
   const original = btn.textContent;

@@ -396,6 +396,41 @@ main {
   background: #fff7d6;
   border-color: #c89c1a;
 }
+.needs-count.mismatch {
+  color: var(--bad);
+  background: var(--bad-bg);
+  border-color: var(--bad);
+  align-items: center;
+  gap: 12px;
+}
+/* `:not([hidden])` so the [hidden] attribute can still hide the element —
+   otherwise `display: flex` would override the UA `display: none` and the
+   dismiss button would do nothing. */
+.needs-count.mismatch:not([hidden]) {
+  display: flex;
+}
+.needs-count.mismatch .needs-count-text {
+  flex: 1;
+}
+.needs-count-close {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 22px;
+  line-height: 1;
+  padding: 2px 8px;
+  margin: -2px -4px -2px 0;
+  cursor: pointer;
+  border-radius: 4px;
+  opacity: 0.7;
+}
+.needs-count-close:hover,
+.needs-count-close:focus-visible {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
+  outline: none;
+}
 .card-actions {
   display: flex;
   align-items: center;
