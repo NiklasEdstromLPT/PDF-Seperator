@@ -412,24 +412,34 @@ main {
 .needs-count.mismatch .needs-count-text {
   flex: 1;
 }
-.needs-count-close {
-  flex-shrink: 0;
+.needs-count-close,
+.needs-count-close:hover,
+.needs-count-close:focus,
+.needs-count-close:focus-visible {
   background: transparent;
   border: none;
-  color: inherit;
-  font-size: 22px;
-  line-height: 1;
-  padding: 2px 8px;
-  margin: -2px -4px -2px 0;
-  cursor: pointer;
-  border-radius: 4px;
-  opacity: 0.7;
+  box-shadow: none;
 }
-.needs-count-close:hover,
+.needs-count-close {
+  flex-shrink: 0;
+  color: inherit;
+  font-size: 30px;
+  line-height: 1;
+  padding: 0 4px;
+  margin: -4px -4px -4px 0;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 100ms ease, color 100ms ease;
+}
+.needs-count-close:hover {
+  opacity: 1;
+  color: #6b1e16;
+}
 .needs-count-close:focus-visible {
   opacity: 1;
-  background: rgba(0, 0, 0, 0.06);
-  outline: none;
+  color: #6b1e16;
+  outline: 2px solid var(--bad);
+  outline-offset: 2px;
 }
 .card-actions {
   display: flex;
