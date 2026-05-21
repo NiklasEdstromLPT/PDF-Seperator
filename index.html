@@ -10,7 +10,7 @@
 
 <header class="app">
   <h1>Dezzy Check Splitter</h1>
-  <a class="sub sub-link" href="./Dezzy_Check_Splitter_How_To_Use.pdf" target="_blank" rel="noopener">How It Works</a>
+  <button id="btn-how-it-works" class="sub sub-link" type="button">How It Works</button>
 </header>
 
 <main>
@@ -88,6 +88,148 @@
     <div id="pending-approval-count" class="needs-count pending" hidden></div>
     <div id="review-needs-count" class="needs-count" hidden></div>
     <div class="grid" id="grid"></div>
+  </section>
+
+  <section id="screen-how-it-works" class="screen how-it-works">
+    <button id="btn-hiw-back" class="subtle hiw-back" type="button">&larr; Back</button>
+
+    <article class="hiw-doc">
+      <header class="hiw-title">
+        <h2>Dezzy Check Splitter</h2>
+        <div class="hiw-subtitle">How to Use</div>
+        <div class="hiw-org">LPT Realty | Accounts Receivable</div>
+      </header>
+
+      <p class="hiw-lede">
+        Dezzy Check Splitter takes a single bulk scan of check packets, automatically detects divider
+        pages, splits the scan into individual transaction files, uses OCR to propose filenames, and
+        outputs individually named PDFs after your review.
+      </p>
+
+      <h3 class="hiw-section">Prep</h3>
+      <p>These steps happen outside the tool, but they determine whether processing goes smoothly.</p>
+      <ol class="hiw-steps">
+        <li><strong>Prep packets:</strong> Remove all staples from each check and its related documents.</li>
+        <li><strong>Insert dividers:</strong> Place a red cardstock divider sheet between every packet.</li>
+        <li><strong>Orient loose checks:</strong> Individual checks must be placed vertically (portrait, short edge first) in the tray. Checks are small, so laying them horizontally can drag the page behind them into the feeder and corrupt the pdf.</li>
+        <li><strong>Stack and scan:</strong> Place the full batch upside down in the scanner tray. Execute a single bulk scan. The scanner outputs one large PDF.</li>
+      </ol>
+      <div class="hiw-callout note">
+        <strong>Note:</strong> After the scan, retrieve each physical check, separate it from its paper documents, and paper
+        clip the documents together. This is unchanged from the current workflow.
+      </div>
+
+      <h3 class="hiw-section">Using the Tool</h3>
+      <ol class="hiw-steps" start="5">
+        <li>Open Dezzy Check Splitter on your desktop.</li>
+        <li>
+          Upload the bulk PDF. Drag and drop the file from the bulk scans folder into the upload area, or click to browse.
+          <ol class="hiw-substeps" type="a">
+            <li>
+              <strong>Optional &mdash; Expected Bundles:</strong> Before uploading, type how many bundles you expect to find in the scan. If the detected count doesn't match what you typed, a red banner appears on the review screen and the download confirmation will surface the mismatch. Leaving the field blank turns the check off entirely. Use this when you've physically counted the packets and want a safety net against the scanner and the software.
+            </li>
+            <li>
+              <strong>Optional &mdash; Paste Deposit Spreadsheet:</strong> Click "Optional: Paste Deposit Spreadsheet" on the upload screen and paste the Check # and Property Address columns straight out of Excel. The tool uses this as a lookup table: when it finds a check# in a packet it matches it to your spreadsheet's address rather than relying on OCR alone. Cuts down OCR errors and skips manual entry for the addresses your spreadsheet already knows.
+            </li>
+          </ol>
+        </li>
+        <li>Wait for processing. The tool will detect divider pages, split the PDF into packets, and run OCR on each packet. A progress indicator shows each stage. This typically takes under a minute for a standard batch.</li>
+        <li>Review the preview screen. Each packet appears as a thumbnail with a proposed filename. Packets that need attention are sorted to the top.</li>
+      </ol>
+
+      <div class="hiw-confidence">
+        <div class="hiw-conf hiw-conf-green">
+          <div class="hiw-conf-title">Green &mdash; High Confidence</div>
+          <div>Address detected with high confidence. Quick visual check, then approve.</div>
+        </div>
+        <div class="hiw-conf hiw-conf-yellow">
+          <div class="hiw-conf-title">Yellow &mdash; Low Confidence</div>
+          <div>Address detected but uncertain. Verify the highlighted OCR source before approving.</div>
+        </div>
+        <div class="hiw-conf hiw-conf-red">
+          <div class="hiw-conf-title">Red &mdash; No Address Found</div>
+          <div>No address detected. Manually enter the property address before approving. Expected on ~30% of packets.</div>
+        </div>
+      </div>
+
+      <ol class="hiw-steps" start="9">
+        <li>
+          For each packet, verify the proposed filename. The OCR source is highlighted on the thumbnail so you can confirm where the address was pulled from.
+          <ol class="hiw-substeps" type="a">
+            <li>If the filename looks correct: click <strong>Approve</strong>.</li>
+            <li>If the filename is wrong: click the filename field to edit it inline, then click <strong>Approve</strong>.</li>
+            <li>If the packet shows red (no address found): type the property address in the filename field before approving. This is expected on roughly 30% of packets and is not a tool error.</li>
+            <li>
+              <strong>Zoom:</strong> Use the magnifier + / &minus; buttons on the badge row above any preview to confirm the correct address and check# were scanned. The zoom behavior depends on what the tool detected:
+              <ul class="hiw-bullets">
+                <li><strong>Standard zoom (one highlight only):</strong> + steps you up through 1&times; &rarr; 1.5&times; &rarr; 2&times; &rarr; 3&times;, recentering on the highlighted region each press and bringing up scrollbars so you can pan.</li>
+                <li><strong>Split zoom (both check# and address detected):</strong> A single + click swaps the preview for a stacked split view &mdash; the check# zoomed in on the top pane, the address zoomed in on the bottom pane, each at a higher magnification than the single view could reach. Use this when you need to verify both fields at glance-readable size without scrolling. &minus; returns to the 1&times; full-page view.</li>
+              </ul>
+            </li>
+          </ol>
+        </li>
+      </ol>
+
+      <div class="hiw-callout tip">
+        <strong>Tip:</strong> All packets must be approved before you can export. The export button activates once every
+        packet has a confirmed filename.
+      </div>
+
+      <ol class="hiw-steps" start="10">
+        <li>Click <strong>Download ZIP</strong>. The tool packages all approved PDFs into a single ZIP file.</li>
+        <li>Copy the PDFs from the ZIP into the AR SharePoint folder.</li>
+        <li>Delete the master bulk scan PDF from the bulk scans folder once files are confirmed in SharePoint.</li>
+      </ol>
+
+      <h3 class="hiw-section">Diagnostic Report (Power Users)</h3>
+      <p>
+        If you want a deeper look at why the tool missed addresses on certain packets &mdash; or you're filing a bug
+        report with the dev team &mdash; you can export a per-packet diagnostic.
+      </p>
+      <ol class="hiw-steps">
+        <li>On the review screen, find the <strong>&hellip;</strong> (More Options) button next to <em>Download All as ZIP</em>.</li>
+        <li>Click it and choose <strong>Export Diagnostic Report</strong>.</li>
+        <li>
+          The tool downloads a self-contained <strong>.html</strong> file you can open in any browser &mdash; no extra
+          tooling needed. It includes a summary table (counts of strong / weak / no-match packets, OCR vs. spreadsheet
+          sources, suspicious misses) plus a per-packet breakdown with the raw OCR text, the candidate addresses
+          considered, confidence scores, and the embedded thumbnail. Send it to the dev team alongside the original scan PDF
+          if you're reporting a problem &mdash; that combination is usually enough to reproduce and debug almost any miss.
+        </li>
+      </ol>
+      <p>
+        This is a developer tool. Day-to-day reviewers don't need it &mdash; you can ignore the &hellip; menu entirely
+        and the standard review-and-download flow still works.
+      </p>
+
+      <h3 class="hiw-section">File Naming</h3>
+      <p>The tool proposes filenames in this format:</p>
+      <pre class="hiw-format">LPTR.[Check #] - [Property Address]</pre>
+      <p>Example: <code>LPTR.1042 - 123 Main St Orlando FL</code></p>
+      <p>You can edit any proposed filename inline in the preview screen before approving. The format should match the existing naming convention in SharePoint.</p>
+
+      <h3 class="hiw-section">What to Expect</h3>
+      <table class="hiw-table">
+        <tbody>
+          <tr>
+            <th scope="row">Divider detection</th>
+            <td>99%+ accuracy on clean scans with properly inserted red dividers.</td>
+          </tr>
+          <tr>
+            <th scope="row">OCR auto-naming</th>
+            <td>85%+ of addressable packets auto-named without correction (excludes the ~30% of packets that contain no property address in the documents).</td>
+          </tr>
+          <tr>
+            <th scope="row">Review time</th>
+            <td>Target under 20 seconds per packet in the preview interface.</td>
+          </tr>
+          <tr>
+            <th scope="row">Packets with no address</th>
+            <td>Flagged red in the preview. Enter the address manually. This is expected behavior, not a tool error.</td>
+          </tr>
+        </tbody>
+      </table>
+    </article>
   </section>
 
 </main>

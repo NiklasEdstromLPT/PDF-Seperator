@@ -2,7 +2,7 @@
 
 export const $ = (id) => document.getElementById(id);
 
-const SCREEN_IDS = ["upload", "progress", "review"];
+const SCREEN_IDS = ["upload", "progress", "review", "how-it-works"];
 
 export function showScreen(name) {
   for (const k of SCREEN_IDS) {

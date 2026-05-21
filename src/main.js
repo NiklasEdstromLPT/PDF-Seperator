@@ -31,6 +31,27 @@ initUpload(({ file, prefix, checkLookup, expectedBundles }) => {
 
 $("btn-restart").addEventListener("click", () => location.reload());
 
+// "How It Works" page — opens from the header link, remembers which screen
+// the user came from so Back returns them mid-task (e.g. mid-review) instead
+// of dumping them back at upload.
+(function initHowItWorks() {
+  const openBtn = $("btn-how-it-works");
+  const backBtn = $("btn-hiw-back");
+  if (!openBtn || !backBtn) return;
+  let returnTo = "upload";
+  openBtn.addEventListener("click", () => {
+    const current = document.querySelector(".screen.active");
+    if (current && current.id !== "screen-how-it-works") {
+      returnTo = current.id.replace(/^screen-/, "");
+    }
+    showScreen("how-it-works");
+    window.scrollTo({ top: 0 });
+  });
+  backBtn.addEventListener("click", () => {
+    showScreen(returnTo);
+  });
+})();
+
 // "…" menu — dev/admin actions that shouldn't clutter the main review flow.
 // Open/close on click, dismiss on outside click or Escape. Menu items live in
 // HTML so adding new ones is just markup + a wire-up below.
